@@ -17,6 +17,9 @@ Levels: 55+ High, 30-54 Elevated, under 30 Lower.
 from datetime import date
 
 HIGH, ELEVATED = 55, 30
+US_STATES = {"AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME",
+             "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI",
+             "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "PR", "CALIFORNIA"}
 
 
 def _span(a, b):
@@ -44,8 +47,11 @@ def score(*, flood=None, elevation=None, alerts=None, rain=None, county=None, st
     def add(key, points, label, detail, source):
         factors.append({"key": key, "points": points, "label": label, "detail": detail, "source": source})
 
-    # 1. FEMA flood zone
-    if flood:
+    # 1. FEMA flood zone (U.S. only: FEMA maps don't cover other countries)
+    in_us = (state or "").upper() in US_STATES
+    if not in_us and not flood:
+        pass
+    elif flood:
         pts = {"high": 40, "moderate": 20, "unknown": 5}.get(flood["level"], 0)
         add("flood_zone", pts, "Flood zone", flood["text"] + (f" (zone {flood['zone']})" if flood.get("zone") else ""), flood["source"])
     else:

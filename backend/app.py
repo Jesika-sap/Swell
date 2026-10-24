@@ -222,8 +222,12 @@ def make_plan():
         try:
             summary, items = ai_plan.personalize(items, r, place_name, household, language)
             translated = language != "en"
-        except ServiceError:
+        except ServiceError as e:
+            print(f"[Swell] AI couldn't write this plan ({ai_plan.LANGUAGES.get(language)}): {e}", flush=True)
             missing.append("ai")
+    elif language != "en":
+        print("[Swell] AI is off, so this plan stays in English. Restart with:  bash start-swell.command --new-key", flush=True)
+        missing.append("ai")
     if not summary:
         summary = ai_plan.fallback_summary(r, place_name)
 
@@ -232,7 +236,7 @@ def make_plan():
     db.execute("""INSERT INTO plans (id, device_id, label, address, lat, lon, county, city, state, language,
                   household, risk, checklist, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                (plan_id, device, label, place.get("address"), lat, lon, place.get("county"), place.get("city"),
-                place.get("state"), language, json.dumps({**household, "country": place.get("country") or "US"}), json.dumps({**r, "summary": summary}),
+                place.get("state"), language, json.dumps({**household, "country": place.get("country") or "US"}), json.dumps({**r, "summary": summary, "translated": translated}),
                 json.dumps(items), ts, ts))
     return jsonify(plan_payload(plan_id, live=live, help_=help_, missing=missing, translated=translated)), 201
 
@@ -270,7 +274,7 @@ def plan_payload(plan_id, live=None, help_=None, missing=None, translated=False)
         "household": hh, "role": hh.get("role", "household"), "farm": hh.get("farm"), "risk": r, "summary": r.get("summary"),
         "checklist": items, "progress": {"done": len(done & {i["id"] for i in items}), "total": len(items)},
         "alerts": live["alerts"], "forecast": live["forecast"][:6], "rain": live["rain"],
-        "help": help_, "enso": ENSO, "missing": missing or [], "translated": translated,
+        "help": help_, "enso": ENSO, "missing": missing or [], "translated": translated or bool(r.get("translated")),
         "created_at": row["created_at"],
     }
 

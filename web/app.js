@@ -233,7 +233,7 @@ function renderPlan() {
         </div>
       </div>
       <p class="risk-summary">${esc(plan.summary)}</p>
-      ${plan.translated ? `<span class="risk-lang">Plan written in ${esc(langName)}</span>` : ''}
+      ${plan.translated ? `<span class="risk-lang">Plan written in ${esc(langName)}</span>` : (plan.language && plan.language !== 'en' && (plan.missing || []).includes('ai') ? `<span class="risk-lang">Couldn’t translate this plan right now, so it’s in English. Make the plan again in a minute.</span>` : '')}
     </section>
 
     ${intl ? (reg ? `<section class="card region-card block"><p class="eyebrow">What El Niño usually does here</p><h3>${esc(reg.name)}</h3><span class="effect ${/wet/.test(reg.effect) ? 'eff-wet' : 'eff-dry'}">${esc(reg.effect)} · ${esc(reg.season)}</span><p class="small" style="margin:0">Live alerts and flood maps are U.S.-only for now. Follow your national weather office for warnings.</p></section>` : '')
@@ -257,7 +257,7 @@ function renderPlan() {
     <section class="block">
       <div class="section-head"><h3>Why this score</h3><span class="muted small">Every point has a source</span></div>
       <ul class="factors card">${r.factors.map((f) => `<li><span class="pts ${f.points >= 25 ? 'hot' : f.points >= 10 ? 'warm' : ''}">+${f.points}</span><div><strong>${esc(f.label)}</strong><p>${esc(f.detail)}</p><small>${esc(f.source)}</small></div></li>`).join('')}</ul>
-      ${plan.missing && plan.missing.length ? `<p class="fineprint">Couldn’t reach: ${esc(plan.missing.join(', '))}. Pull to refresh later.</p>` : ''}
+      ${plan.missing && plan.missing.length ? `<p class="fineprint">Couldn’t reach: ${esc(plan.missing.map((m) => m === 'ai' ? 'AI translation' : m).join(', '))}. Pull to refresh later.</p>` : ''}
     </section>
 
     ${plan.forecast && plan.forecast.length ? `<section class="block">
