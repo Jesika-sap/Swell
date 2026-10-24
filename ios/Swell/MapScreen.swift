@@ -61,7 +61,7 @@ struct ReportDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(report.title).font(.title2.bold())
-            Text("\(report.confirmations + (confirmed ? 1 : 0)) neighbors confirmed this").foregroundStyle(.secondary)
+            Text("\(report.confirmations + (confirmed ? 1 : 0)) people confirmed this").foregroundStyle(.secondary)
             if let note = report.note, !note.isEmpty { Text(note) }
             Button {
                 Task { try? await APIClient.shared.confirm(report: report.id); confirmed = true; dismiss() }
@@ -107,7 +107,7 @@ struct ReportSheet: View {
                     }
                     if analyzing { HStack { ProgressView(); Text("AI is looking at your photo…") } }
                     if let aiNote { Label(aiNote, systemImage: "sparkles").foregroundStyle(Theme.sea) }
-                } footer: { Text("It goes on the map where the map is centered. Don’t take photos in dangerous spots.") }
+                } footer: { Text("People in your communities will see it. Don’t take photos in dangerous spots.") }
 
                 Section("What is it?") {
                     Picker("Kind", selection: $kind) { ForEach(kinds, id: \.0) { Text($0.1).tag($0.0) } }
@@ -119,7 +119,7 @@ struct ReportSheet: View {
                 }
                 if let errorText { Text(errorText).foregroundStyle(.red) }
                 Button { Task { await send() } } label: {
-                    if sending { ProgressView() } else { Text("Post to map").bold() }
+                    if sending { ProgressView() } else { Text("Post report").bold() }
                 }
                 .disabled(sending)
             }

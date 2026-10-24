@@ -21,6 +21,7 @@ final class AppStore {
     var plan: Plan?
     var error: String?
     var addingPlace = false
+    var account: Account?
     private(set) var language: String = UserDefaults.standard.string(forKey: "swell.lang") ?? "en"
     private(set) var currentId: String? = UserDefaults.standard.string(forKey: "swell.current")
 
@@ -62,6 +63,30 @@ final class AppStore {
         setCurrent(p.id)
         addingPlace = false
         error = nil
+    }
+
+    /// Log in or sign up. Logging in switches this phone to the account's id and opens its first plan.
+    func signIn(name: String?, email: String, password: String) async throws {
+        if let name {
+            account = try await APIClient.shared.signup(name: name, email: email, password: password).account
+        } else {
+            let r = try await APIClient.shared.login(email: email, password: password)
+            if let id = r.deviceId { APIClient.shared.useDevice(id) }
+            account = r.account
+            let plans = try await APIClient.shared.plans()
+            if let first = plans.first, !plans.contains(where: { $0.id == currentId }) { await open(first.id) }
+        }
+    }
+
+    func signOut() {
+        APIClient.shared.useDevice(UUID().uuidString)
+        account = nil
+        setCurrent(nil)
+        plan = nil
+    }
+
+    func refreshAccount() async {
+        account = try? await APIClient.shared.account().account
     }
 
     /// AI Scan: send a photo, get new tasks added to the top of the checklist.
@@ -114,8 +139,8 @@ struct MainTabs: View {
                 .tabItem { Label("My plan", systemImage: "shield.lefthalf.filled") }
             NavigationStack { ChecklistView() }
                 .tabItem { Label("Checklist", systemImage: "checklist") }
-            NavigationStack { MapScreen() }
-                .tabItem { Label("Map", systemImage: "map") }
+            NavigationStack { CommunityView() }
+                .tabItem { Label("Community", systemImage: "person.3") }
             NavigationStack { HelpView() }
                 .tabItem { Label("Help", systemImage: "lifepreserver") }
             NavigationStack { NewsView() }

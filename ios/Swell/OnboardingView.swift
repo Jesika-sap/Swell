@@ -71,9 +71,9 @@ struct OnboardingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(LinearGradient(colors: [Theme.ocean, Theme.ocean2], startPoint: .top, endPoint: .bottom), in: RoundedRectangle(cornerRadius: 24))
 
-                fact("83%+", "chance of a strong to very strong El Niño this winter", "NOAA, Oct 2026")
-                fact("1–2 ft", "higher ocean levels than tide tables predict in San Mateo County", "San Mateo County, Oct 2026")
-                fact("2", "emergencies declared: California (Sept 21) and San Mateo County (Oct 20)", "State of California · San Mateo County")
+                fact("83%+", "chance of a strong to very strong El Niño this winter", "NOAA Climate Prediction Center, Oct 2026")
+                fact("2–7 yrs", "how often El Niño comes back, bringing floods to some places and drought to others", "NOAA")
+                fact("$5.7T", "lost by the world economy after the last very strong El Niño, in 1997–98", "Callahan & Mankin, Science, 2023")
 
                 Text("Language for your plan").font(.subheadline.bold())
                 Picker("Language", selection: Binding(get: { store.language }, set: { store.setLanguage($0) })) {

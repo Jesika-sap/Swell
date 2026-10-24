@@ -10,13 +10,19 @@ struct APIError: LocalizedError {
 final class APIClient {
     static let shared = APIClient()
 
-    let deviceId: String = {
+    /// This phone's private id. Logging in swaps it for the account's id, so the account's plans show up here.
+    private(set) var deviceId: String = {
         let key = "swell.deviceId"
         if let id = UserDefaults.standard.string(forKey: key) { return id }
         let id = UUID().uuidString
         UserDefaults.standard.set(id, forKey: key)
         return id
     }()
+
+    func useDevice(_ id: String) {
+        deviceId = id
+        UserDefaults.standard.set(id, forKey: "swell.deviceId")
+    }
 
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
@@ -124,4 +130,42 @@ final class APIClient {
     }
 
     func regions() async throws -> Regions { try await get("/api/regions") }
+
+    // MARK: accounts
+
+    func account() async throws -> AccountReply { try await get("/api/account") }
+
+    func signup(name: String, email: String, password: String) async throws -> AccountReply {
+        try await post("/api/account/signup", ["name": name, "email": email, "password": password])
+    }
+
+    func login(email: String, password: String) async throws -> AccountReply {
+        try await post("/api/account/login", ["email": email, "password": password])
+    }
+
+    // MARK: communities
+
+    func communities() async throws -> CommunityList { try await get("/api/communities") }
+
+    func joinCommunity(key: String) async throws -> CommunitySummary {
+        try await post("/api/communities/join", ["key": key])
+    }
+
+    func joinFamily(code: String) async throws -> CommunitySummary {
+        try await post("/api/communities/join", ["code": code])
+    }
+
+    func createFamily(name: String) async throws -> CommunitySummary {
+        try await post("/api/communities", ["name": name])
+    }
+
+    func community(_ id: String) async throws -> CommunityDetail { try await get("/api/communities/\(id)") }
+
+    func leaveCommunity(_ id: String) async throws {
+        _ = try await request("/api/communities/\(id)/leave", method: "POST")
+    }
+
+    func markSafe(_ id: String) async throws -> CommunityDetail {
+        try await post("/api/communities/\(id)/safe", ["safe": true])
+    }
 }

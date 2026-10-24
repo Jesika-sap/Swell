@@ -196,6 +196,7 @@ struct StormReport: Codable, Identifiable {
     let confirmations: Int
     let hasPhoto: Int?
     let createdAt: String
+    var kindLabel: String?
 }
 
 struct PhotoAnalysis: Codable {
@@ -372,3 +373,88 @@ let languages: [(code: String, name: String)] = [
     ("en", "English"), ("es", "Español"), ("ne", "नेपाली (Nepali)"), ("zh", "中文 (Chinese)"), ("tl", "Tagalog"),
     ("vi", "Tiếng Việt"), ("ko", "한국어 (Korean)"), ("hi", "हिन्दी (Hindi)"), ("ar", "العربية (Arabic)"), ("ru", "Русский"),
 ]
+
+
+// MARK: accounts and communities
+
+struct Account: Codable, Equatable {
+    let id: String
+    let name: String
+    let email: String
+}
+
+struct AccountReply: Codable {
+    let account: Account?
+    let deviceId: String?
+}
+
+struct CommunitySummary: Codable, Identifiable, Hashable {
+    let id: String
+    let kind: String          // county, city, family
+    let name: String
+    let members: Int
+    let maxMembers: Int?
+    let owner: Bool
+}
+
+struct SuggestedCommunity: Codable, Identifiable {
+    let key: String
+    let kind: String
+    let name: String
+    var id: String { key }
+}
+
+struct CommunityList: Codable {
+    let account: Account?
+    let mine: [CommunitySummary]
+    let suggested: [SuggestedCommunity]
+    let familyMax: Int
+}
+
+struct MemberPlace: Codable, Hashable {
+    let label: String?
+    let city: String?
+    let level: String
+    let score: Int
+    let done: Int
+    let total: Int
+}
+
+struct Member: Codable, Identifiable {
+    let name: String
+    let role: String
+    let you: Bool
+    let safeAt: String?
+    let places: [MemberPlace]
+    var id: String { name + role + (safeAt ?? "") }
+}
+
+struct CommunityDetail: Codable {
+    let id: String
+    let kind: String
+    let name: String
+    let members: Int
+    let maxMembers: Int?
+    let owner: Bool
+    let inviteCode: String?
+    let people: [Member]?
+    let reports: [StormReport]
+}
+
+enum CommunityKind {
+    static func label(_ kind: String) -> String {
+        switch kind {
+        case "county": return "County"
+        case "city": return "City"
+        default: return "Private family group"
+        }
+    }
+
+    static func symbol(_ kind: String) -> String {
+        switch kind {
+        case "county": return "mountain.2"
+        case "city": return "building.2"
+        default: return "person.3"
+        }
+    }
+}
