@@ -110,6 +110,12 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(p["translated"])
         self.assertTrue(p["checklist"][0]["title"].startswith("ES: "))
         self.assertIn("arena", p["summary"])
+        # Switching an existing plan back to English keeps ticked boxes.
+        self.c.post(f"/api/plan/{p['id']}/check", json={"item_id": p["checklist"][0]["id"], "done": True}, headers=DEV)
+        en = self.c.post(f"/api/plan/{p['id']}/language", json={"language": "en"}, headers=DEV).get_json()
+        self.assertEqual(en["language"], "en")
+        self.assertFalse(en["checklist"][0]["title"].startswith("ES: "))
+        self.assertEqual(en["progress"]["done"], 1)
 
     def test_ai_that_drops_a_task_is_rejected(self):
         fakes.GEMINI_MODE["plan"] = "drop"

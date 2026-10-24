@@ -296,6 +296,46 @@ def own_plan(plan_id):
         abort(404)
 
 
+@app.post("/api/plan/<plan_id>/language")
+def change_language(plan_id):
+    """Rewrite an existing plan in another language. The checklist is rebuilt from
+    the same rules (so nothing is lost), then translated; ticked boxes stay ticked."""
+    own_plan(plan_id)
+    rate_limit("plan", 40)
+    language = body().get("language")
+    if language not in ai_plan.LANGUAGES:
+        raise BadRequest("Pick a language from the list")
+    row = db.one("SELECT * FROM plans WHERE id = ?", (plan_id,))
+    hh = json.loads(row["household"])
+    role, farm = hh.get("role", "household"), hh.get("farm")
+    flags = {k: bool(hh.get(k)) for k in HOUSEHOLD_KEYS}
+    place = {"county": row["county"], "city": row["city"], "state": row["state"], "country": hh.get("country", "US")}
+    r = {k: v for k, v in json.loads(row["risk"]).items() if k not in ("summary", "translated")}
+    reg = regions_svc.for_place(place)
+    help_ = resources.for_place(place, row["lat"], row["lon"])
+    items = checklist.build(r, flags, county=place["county"], alert_system=help_["alert_system"],
+                            nearest_sandbags=(help_["sandbags"] or [None])[0], role=role, farm=farm, region=reg)
+    items += [i for i in json.loads(row["checklist"]) if i.get("source") == "scan"]  # keep AI Scan tasks
+    place_name = ", ".join(x for x in [place.get("city"), place.get("state"), place["country"] if place["country"] != "US" else None] if x) or "your area"
+    summary, translated, missing = None, False, []
+    if gemini.available():
+        try:
+            summary, items = ai_plan.personalize(items, r, place_name, {**flags, "role": role, "farm": farm}, language)
+            translated = language != "en"
+        except ServiceError as e:
+            print(f"[Swell] AI couldn't rewrite this plan ({ai_plan.LANGUAGES.get(language)}): {e}", flush=True)
+            missing.append("ai")
+    elif language != "en":
+        missing.append("ai")
+    if language != "en" and not translated:
+        raise BadRequest("Couldn't translate right now. Check that AI is ON in Terminal, then try again.")
+    if not summary:
+        summary = ai_plan.fallback_summary(r, place_name)
+    db.execute("UPDATE plans SET language = ?, checklist = ?, risk = ?, updated_at = ? WHERE id = ?",
+               (language, json.dumps(items), json.dumps({**r, "summary": summary, "translated": translated}), now_iso(), plan_id))
+    return jsonify(plan_payload(plan_id, help_=help_, translated=translated))
+
+
 @app.get("/api/plan/<plan_id>")
 def get_plan(plan_id):
     own_plan(plan_id)

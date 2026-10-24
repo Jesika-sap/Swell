@@ -15,7 +15,8 @@ const ICON = {
   drop: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
   phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/>',
   camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
-  spark: '<path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/>'
+  spark: '<path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k] || ''}</svg>`;
 
@@ -233,7 +234,9 @@ function renderPlan() {
         </div>
       </div>
       <p class="risk-summary">${esc(plan.summary)}</p>
-      ${plan.translated ? `<span class="risk-lang">Plan written in ${esc(langName)}</span>` : (plan.language && plan.language !== 'en' && (plan.missing || []).includes('ai') ? `<span class="risk-lang">Couldn’t translate this plan right now, so it’s in English. Make the plan again in a minute.</span>` : '')}
+      <label class="lang-pick">${icon('globe')}<span class="sr-only">Plan language</span>
+        <select id="planLang">${LANGS.map(([k, v]) => `<option value="${k}" ${k === (plan.language || 'en') ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+      ${plan.language && plan.language !== 'en' && (plan.missing || []).includes('ai') ? `<span class="risk-lang">Couldn’t translate this plan right now, so it’s in English. Pick the language again in a minute.</span>` : ''}
     </section>
 
     ${intl ? (reg ? `<section class="card region-card block"><p class="eyebrow">What El Niño usually does here</p><h3>${esc(reg.name)}</h3><span class="effect ${/wet/.test(reg.effect) ? 'eff-wet' : 'eff-dry'}">${esc(reg.effect)} · ${esc(reg.season)}</span><p class="small" style="margin:0">Live alerts and flood maps are U.S.-only for now. Follow your national weather office for warnings.</p></section>` : '')
@@ -281,6 +284,13 @@ function renderPlan() {
   requestAnimationFrame(() => $$('.gauge .val', page).forEach((c) => { c.style.strokeDashoffset = c.dataset.target; }));
   bindTasks(page);
   $$('[data-go]', page).forEach((b) => b.addEventListener('click', () => switchView(b.dataset.go)));
+  $('#planLang').addEventListener('change', async (e) => {
+    const lang = e.target.value, sel = e.target;
+    sel.disabled = true;
+    toast(lang === 'en' ? 'Switching to English…' : 'Translating your plan…');
+    try { const p = await api(`/api/plan/${plan.id}/language`, { method: 'POST', body: { language: lang } }); state.language = lang; save(); setPlan(p); toast('Done.'); }
+    catch (err) { sel.disabled = false; sel.value = plan.language || 'en'; toast(err.message); }
+  });
   $('#scanBtn').addEventListener('click', openScan);
 }
 
