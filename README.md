@@ -27,46 +27,21 @@ docs/               ARCHITECTURE.md and the architecture diagram
 render.yaml         one-click hosting on Render (server + PostgreSQL)
 ```
 
-## Run it on your Mac (easiest for the demo video)
+## Run it on your Mac (3 steps)
 
-You run the Python server in Terminal, then open the website in your browser and the iPhone app in Xcode's Simulator. Nothing has to be online.
-
-**1. Get the code.** In Terminal:
+**1. Get the code (one time).** Open Terminal and paste:
 ```
-cd ~/Desktop
-git clone https://github.com/Jesika-sap/swell
-cd swell/backend
+git clone https://github.com/Jesika-sap/Swell ~/Desktop/Swell
 ```
+(If your Mac asks to install developer tools, click Install, then paste the line again.)
 
-**2. Set up Python (one time).**
-```
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+**2. Start the server.** In Finder, open Desktop → Swell and double-click **start-swell.command**. The first time, it sets itself up and asks for your Gemini API key (free at https://aistudio.google.com/apikey). Paste it and press Enter. It's saved only on your Mac. The website opens at http://localhost:5050. Leave the Terminal window open.
 
-**3. Get a Gemini API key (one time).** Go to https://aistudio.google.com/apikey, sign in with Google, click **Create API key**, and copy it. Keep it private: don't paste it into code, chat or GitHub.
+If your Mac says it can't open the file, right-click it, choose **Open**, then **Open** again.
 
-**4. Start the server.** In the same Terminal window:
-```
-export GEMINI_API_KEY=paste-your-key-here
-PORT=5050 python3 app.py
-```
-Leave this window open. (Port 5050 is used because Macs already use 5000 for AirPlay.)
+**3. Open the iPhone app.** Double-click **ios/Swell.xcodeproj**. At the top of Xcode, pick an iPhone simulator, then press **▶** (Cmd+R).
 
-**5. Open the website:** http://localhost:5050
-
-**6. Open the iPhone app:** follow [ios/README.md](ios/README.md). It already points at http://localhost:5050.
-
-Next time, you only need:
-```
-cd ~/Desktop/swell/backend
-source .venv/bin/activate
-export GEMINI_API_KEY=paste-your-key-here
-PORT=5050 python3 app.py
-```
-
-Want to try it with no internet and no key? Run `python3 demo_server.py` instead. It uses fake data and the same address.
+Want to try it with no internet and no key? In Terminal: `cd ~/Desktop/Swell/backend && python3 demo_server.py`, then open http://localhost:5050.
 
 Run the tests:
 ```

@@ -4,21 +4,17 @@ The iPhone app uses the same Python server as the website, so plans, checklist p
 
 Requires a Mac with **Xcode 16 or newer** and runs on **iOS 17+**.
 
-## Set it up in Xcode (about 5 minutes)
+## Open it in Xcode
 
-1. Open Xcode → **File → New → Project… → iOS → App** → Next.
-2. Fill in **Product Name:** `Swell`, **Interface:** SwiftUI, **Language:** Swift. Leave Storage as None and uncheck tests. Save it inside this `ios` folder.
-3. In the left sidebar, **delete** the two files Xcode made: `ContentView.swift` and `SwellApp.swift`. Choose **Move to Trash**.
-4. Drag every `.swift` file from `ios/Swell/` (in Finder) into the yellow **Swell** folder in Xcode's sidebar. When asked, check **Copy items if needed** and make sure the **Swell** target is checked.
-5. Let the app talk to the server on your Mac: click the blue **Swell** project at the top of the sidebar → the **Swell** target → **Info** tab. Hover over any row, click **+**, type `App Transport Security Settings`, and press Enter. Click its arrow, click **+** inside it, choose **Allow Arbitrary Loads**, and set it to **YES**. (Only needed while the server runs on your Mac at `http://localhost:5050`, which is what `Config.swift` uses.)
-6. Start the server in Terminal (see the main README, "Run it on your Mac").
-7. Pick an iPhone simulator at the top (for example iPhone 16) and press **▶ Run** (Cmd+R).
+1. Start the server first: double-click **start-swell.command** in the main Swell folder.
+2. Double-click **Swell.xcodeproj** in this folder.
+3. Pick an iPhone simulator at the top (for example iPhone 16) and press **▶** (Cmd+R).
+
+The project already includes every Swift file and lets the app talk to the server on your Mac (`Swell-Info.plist`). To run it on your own iPhone, plug it in, choose it at the top, and set **Signing & Capabilities → Team** to your Apple ID.
+
+**Tip for the demo video:** drag a photo from Finder onto the Simulator to add it to Photos, so you can use it in AI Scan.
 
 If you put the server online later, change `apiBase` in `Config.swift` to that address.
-
-**Tip for the demo video:** in the Simulator, drag a photo from Finder onto the phone to add it to Photos, so you can use it in AI Scan.
-
-To run it on your own iPhone, plug it in, choose it at the top, and set **Signing & Capabilities → Team** to your Apple ID.
 
 ## Files
 
