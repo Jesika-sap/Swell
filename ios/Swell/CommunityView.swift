@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import MapKit
 
-/// Communities: your county, your city, and private family groups (up to 5 people).
+/// Communities: your county, your city, and private family groups (any size).
 /// Inside one you see storm reports from that area. You need an account to join.
 struct CommunityView: View {
     @Environment(AppStore.self) private var store
@@ -33,7 +33,7 @@ struct CommunityView: View {
         .task { await load() }
         .refreshable { await load() }
         .sheet(item: $accountMode, onDismiss: { Task { await load() } }) { mode in AccountSheet(mode: mode) }
-        .sheet(isPresented: $showNewFamily, onDismiss: { Task { await load() } }) { NewFamilySheet(max: list?.familyMax ?? 5) }
+        .sheet(isPresented: $showNewFamily, onDismiss: { Task { await load() } }) { NewFamilySheet() }
         .sheet(isPresented: $showJoinCode, onDismiss: { Task { await load() } }) { JoinCodeSheet() }
         .sheet(isPresented: $reporting) {
             if let plan = store.plan {
@@ -94,7 +94,7 @@ struct CommunityView: View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Family group").font(.headline)
-                Text("A private group for up to \(list.familyMax) people. See each other’s places and checklist progress, and tap “I’m safe” after a storm.")
+                Text("A private group for your family or friends, as big as you want. See each other’s places and checklist progress, and tap “I’m safe” after a storm.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 HStack {
                     Button { showNewFamily = true } label: { Text("Start a group").frame(maxWidth: .infinity) }
@@ -212,7 +212,7 @@ struct CommunityDetailView: View {
 
     @ViewBuilder
     private func familySection(_ d: CommunityDetail) -> some View {
-        Section("Members · \(d.members) of \(d.maxMembers ?? 5)") {
+        Section("Members · \(d.members)") {
             ForEach(d.people ?? []) { p in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -243,7 +243,7 @@ struct CommunityDetailView: View {
                 }
             } label: { Label("I’m safe", systemImage: "checkmark.shield").bold().frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent).controlSize(.large)
-            if let code = d.inviteCode, d.members < (d.maxMembers ?? 5) {
+            if let code = d.inviteCode {
                 HStack {
                     Text("Invite code").font(.caption).foregroundStyle(.secondary)
                     Text(code).font(.title3.monospaced().bold())
@@ -344,7 +344,6 @@ struct AccountSheet: View {
 }
 
 struct NewFamilySheet: View {
-    let max: Int
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var errorText: String?
@@ -354,7 +353,7 @@ struct NewFamilySheet: View {
             Form {
                 Section {
                     TextField("Group name, e.g. Sapkota family", text: $name)
-                } footer: { Text("Up to \(max) people. You’ll get a code to share with them.") }
+                } footer: { Text("Add as many people as you want. You’ll get a code to share with them.") }
                 if let errorText { Text(errorText).foregroundStyle(.red) }
                 Button("Create group") {
                     Task {

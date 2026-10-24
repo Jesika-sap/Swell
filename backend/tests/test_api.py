@@ -359,16 +359,17 @@ class AccountCommunityTests(unittest.TestCase):
         self.assertEqual(detail["reports"][0]["title"], "Clogged drain")
         self.assertEqual(c.get(f"/api/communities/{county['id']}", headers=OTHER).status_code, 400)  # no account
 
-        # Family group: invite code, 5-person limit, "I'm safe".
+        # Family group: invite code, no size limit, "I'm safe".
         fam = c.post("/api/communities", json={"name": "Sapkota family"}, headers=b).get_json()
         code = c.get(f"/api/communities/{fam['id']}", headers=b).get_json()["invite_code"]
         for i in range(4):
             h = {"X-Device-Id": f"cousin-device-{i}xx"}
             c.post("/api/account/signup", json={"name": f"Cousin {i}", "email": f"c{i}@example.com", "password": "password123"}, headers=h)
             self.assertEqual(c.post("/api/communities/join", json={"code": code.lower()}, headers=h).status_code, 201)
-        h = {"X-Device-Id": "one-too-many-zz"}
+        h = {"X-Device-Id": "sixth-member-zz"}
         c.post("/api/account/signup", json={"name": "Extra", "email": "x@example.com", "password": "password123"}, headers=h)
-        self.assertEqual(c.post("/api/communities/join", json={"code": code}, headers=h).status_code, 400)  # full
+        self.assertEqual(c.post("/api/communities/join", json={"code": code}, headers=h).status_code, 201)  # no size limit
+        self.assertEqual(c.post("/api/communities/join", json={"code": "WRONG1"}, headers=h).status_code, 400)
         safe = c.post(f"/api/communities/{fam['id']}/safe", json={"safe": True}, headers=b).get_json()
         me = [p for p in safe["people"] if p["you"]][0]
         self.assertTrue(me["safe_at"])

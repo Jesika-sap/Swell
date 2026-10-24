@@ -733,12 +733,11 @@ def login():
 
 # ---------------------------------------------------------------- communities
 #
-# Three kinds: your county, your city, and private family groups (up to 5
-# people, joined with an invite code). Inside a community you see the storm
+# Three kinds: your county, your city, and private family groups (any size,
+# joined with an invite code). Inside a community you see the storm
 # reports people posted in that area. County and city communities can only be
 # joined for places you have a plan for, so the list stays local.
 
-FAMILY_MAX = 5
 COUNTY_MILES, CITY_MILES, FAMILY_MILES = 40, 5, 3
 CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O or 1/I mix-ups
 
@@ -786,7 +785,6 @@ def _community_summary(c, account_id):
     n = db.one("SELECT COUNT(*) AS n FROM community_members WHERE community_id = ?", (c["id"],))["n"]
     name = geocode.clean_city(c["name"]) if c["kind"] == "city" else c["name"]
     return {"id": c["id"], "kind": c["kind"], "name": name, "members": n,
-            "max_members": FAMILY_MAX if c["kind"] == "family" else None,
             "owner": c["owner_id"] == account_id}
 
 
@@ -811,7 +809,7 @@ def list_communities():
                 joined_keys |= {c["place_key"], f"{kind}:{region}:{geocode.clean_city(name) if kind == 'city' else name}"}
     suggested = [{"key": s["key"], "kind": s["kind"], "name": s["name"]}
                  for s in _place_communities(g.device).values() if s["key"] not in joined_keys]
-    return jsonify({"account": account_public(a), "mine": mine, "suggested": suggested, "family_max": FAMILY_MAX})
+    return jsonify({"account": account_public(a), "mine": mine, "suggested": suggested})
 
 
 @app.post("/api/communities/join")
@@ -824,9 +822,6 @@ def join_community():
         c = db.one("SELECT * FROM communities WHERE invite_code = ?", (code,))
         if not c:
             raise BadRequest("That invite code didn't match a group")
-        n = db.one("SELECT COUNT(*) AS n FROM community_members WHERE community_id = ?", (c["id"],))["n"]
-        if not _membership(c["id"], a["id"]) and n >= FAMILY_MAX:
-            raise BadRequest(f"That group is full ({FAMILY_MAX} people)")
     else:
         s = _place_communities(g.device).get(str(d.get("key") or ""))
         if not s:

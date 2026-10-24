@@ -687,7 +687,7 @@ async function renderCommunity() {
         <span class="comm-txt"><strong>${esc(s.name)}</strong><small>${COMM_KIND[s.kind]}</small></span><span class="pill-btn">Join</span></button></li>`).join('')}</ul></section>` : ''}
     <section class="card block fam-card">
       <h3>Family group</h3>
-      <p class="small">A private group for up to ${d.family_max} people. See each other’s places and checklist progress, and tap “I’m safe” after a storm.</p>
+      <p class="small">A private group for your family or friends, as big as you want. See each other’s places and checklist progress, and tap “I’m safe” after a storm.</p>
       <div class="btn-row"><button class="btn btn-primary" type="button" id="newFam">Start a group</button><button class="btn btn-ghost" type="button" id="joinFam">Join with a code</button></div>
     </section>
     <button class="btn btn-ghost btn-wide" type="button" id="reportBtn">${icon('camera')} Report a storm problem</button>`;
@@ -699,7 +699,7 @@ async function renderCommunity() {
     catch (e) { b.disabled = false; toast(e.message); }
   }));
   $('#newFam').addEventListener('click', () => {
-    openSheet(`<h2 id="sheetTitle">Start a family group</h2><p class="muted small">Up to ${d.family_max} people. You’ll get a code to share with them.</p>
+    openSheet(`<h2 id="sheetTitle">Start a family group</h2><p class="muted small">Add as many people as you want. You’ll get a code to share with them.</p>
       <label class="field-label" for="famName">Group name</label><input id="famName" type="text" maxlength="40" placeholder="${esc(d.account.name)}’s family">
       <button class="btn btn-primary btn-wide" type="button" id="famGo">Create group</button>`);
     $('#famGo').addEventListener('click', async () => {
@@ -728,7 +728,7 @@ async function renderCommunityDetail(id) {
   page.innerHTML = `
     <button class="back-link" type="button" id="commBack">← All communities</button>
     <div class="comm-head"><span class="comm-ic big k-${c.kind}"><svg viewBox="0 0 24 24" aria-hidden="true">${COMM_ICON[c.kind]}</svg></span>
-      <div><h2 style="margin:0">${esc(c.name)}</h2><p class="muted small" style="margin:2px 0 0">${COMM_KIND[c.kind]} · ${c.members}${fam ? ` of ${c.max_members}` : ''} ${c.members === 1 ? 'member' : 'members'}</p></div></div>
+      <div><h2 style="margin:0">${esc(c.name)}</h2><p class="muted small" style="margin:2px 0 0">${COMM_KIND[c.kind]} · ${c.members} ${c.members === 1 ? 'member' : 'members'}</p></div></div>
     <div class="comm-map" id="commMap" role="img" aria-label="Map of storm reports in ${esc(c.name)}"></div>
     ${fam ? `<section class="card block">
       <div class="section-head"><h3>Members</h3></div>
@@ -738,8 +738,8 @@ async function renderCommunityDetail(id) {
         ${p.places.length ? `<div class="place-chips">${p.places.map((pl) => `<span class="place-chip"><i class="dot lv-${pl.level}"></i>${esc(pl.label)}${pl.city ? `, ${esc(pl.city)}` : ''} · ${pl.done}/${pl.total} done</span>`).join('')}</div>` : '<small>No plan yet</small>'}
       </div></li>`).join('')}</ul>
       <button class="btn btn-primary btn-wide" type="button" id="safeBtn">I’m safe</button>
-      ${c.members < c.max_members ? `<div class="invite"><span>Invite code</span><b>${esc(c.invite_code)}</b><button class="pill-btn" type="button" id="copyCode">Copy</button></div>
-      <p class="fineprint">Send this code to family. They create an account and tap “Join with a code.”</p>` : '<p class="fineprint">This group is full.</p>'}
+      ${fam ? `<div class="invite"><span>Invite code</span><b>${esc(c.invite_code)}</b><button class="pill-btn" type="button" id="copyCode">Copy</button></div>
+      <p class="fineprint">Send this code to family. They create an account and tap “Join with a code.”</p>` : ''}
     </section>` : ''}
     <section class="block">
       <div class="section-head"><h3>Storm reports</h3><button class="link-btn" type="button" id="reportHere">+ Report</button></div>

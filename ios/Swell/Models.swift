@@ -408,7 +408,6 @@ struct CommunityList: Codable {
     let account: Account?
     let mine: [CommunitySummary]
     let suggested: [SuggestedCommunity]
-    let familyMax: Int
 }
 
 struct MemberPlace: Codable, Hashable {
