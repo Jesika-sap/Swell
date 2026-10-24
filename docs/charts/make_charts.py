@@ -3,10 +3,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import font_manager as fm
 from matplotlib.patches import Rectangle
-GF="/tmp/claude-0/-home-claude/b075b664-4752-59c5-9453-4396bc49b713/scratchpad/gf/ofl/lato/"
+GF="fonts/"  # Lato .ttf files from github.com/google/fonts (ofl/lato)
 for f in ["Lato-Regular.ttf","Lato-Bold.ttf","Lato-Black.ttf"]: fm.fontManager.addfont(GF+f)
 plt.rcParams.update({"font.family":"Lato","font.size":15})
-OUT="/home/claude/elnino/docs/charts/"
+OUT=""  # writes the PNGs next to this script
 NAVY="#0B3349"; INK="#16222C"; MUTED="#4E5D69"; TEAL="#0E7486"; LIGHT="#8FC1CB"; AMBER="#E2892A"; GOLD="#ECB868"; BG="#FAFAFA"
 
 def base(w=9, h=4.2, bg=BG):
