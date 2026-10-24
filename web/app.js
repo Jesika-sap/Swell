@@ -635,10 +635,11 @@ async function renderNews() {
   const page = $('#newsPage');
   if (!plan) return;
   page.innerHTML = `<h2>El Niño news</h2>
-    <div class="seg" role="group" aria-label="News">${[['local', `Near ${plan.place.county || 'you'}`], ['world', 'Around the world']].map(([k, t]) => `<button type="button" data-news="${k}" aria-pressed="${k === newsTab}">${esc(t)}</button>`).join('')}</div>
+    <div class="seg" role="group" aria-label="News">${[['local', `Near ${plan.place.county || 'you'}`], ['tracker', 'El Niño tracker'], ['world', 'Around the world']].map(([k, t]) => `<button type="button" data-news="${k}" aria-pressed="${k === newsTab}">${esc(t)}</button>`).join('')}</div>
     <div id="newsBody"><div class="card skeleton"><span></span><span></span><span></span></div></div>`;
   $$('[data-news]', page).forEach((b) => b.addEventListener('click', () => { newsTab = b.dataset.news; renderNews(); }));
   const body = $('#newsBody');
+  if (newsTab === 'tracker') { renderTracker(body); return; }
   if (newsTab === 'world') {
     try { regionsCache = regionsCache || await api('/api/regions'); } catch (e) { body.innerHTML = `<div class="notice">${esc(e.message)}</div>`; return; }
     body.innerHTML = `<p class="muted" style="margin-top:12px">The same El Niño brings different dangers to different places. ${esc(regionsCache.note)}</p>
@@ -659,6 +660,34 @@ async function renderNews() {
       <p class="fineprint">Summaries are written by AI from the news sources above and can contain mistakes. Check the sources.</p>`
     : `<div class="card enso-card block"><h3>${esc(n.enso.status)}</h3><p class="small">${esc(n.enso.detail)}</p><ul class="events">${n.enso.events.map((e) => `<li>${esc(e.text)}<small><a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.source)}</a></small></li>`).join('')}</ul></div>
       <p class="fineprint">Live news needs the server’s AI key.</p>`}`;
+}
+
+let ensoCache = null;
+async function renderTracker(body) {
+  try { ensoCache = ensoCache || await api('/api/enso'); } catch (e) { body.innerHTML = `<div class="notice">${esc(e.message)}</div>`; return; }
+  const t = ensoCache.tracker;
+  if (!t) { body.innerHTML = '<div class="notice">Tracker data isn’t available.</div>'; return; }
+  const max = 3, W = 320, H = 170, bw = W / (t.history.length + 1);
+  const bars = t.history.map((h, i) => {
+    const bh = (h.peak / max) * (H - 40), x = i * bw + 4, y = H - 22 - bh;
+    const cls = h.strength === 'very strong' ? 'bar-vs' : 'bar-s';
+    return `<rect class="${cls}" x="${x}" y="${y}" width="${bw - 8}" height="${bh}" rx="3"/><text class="bar-val" x="${x + (bw - 8) / 2}" y="${y - 4}">${h.peak.toFixed(1)}</text><text class="bar-lab" x="${x + (bw - 8) / 2}" y="${H - 8}">${esc(h.season.slice(2, 4))}</text>`;
+  }).join('');
+  const fx = t.history.length * bw + 4;
+  const forecast = `<rect class="bar-fc" x="${fx}" y="${H - 22 - (2.0 / max) * (H - 40)}" width="${bw - 8}" height="${(2.0 / max) * (H - 40)}" rx="3"/><text class="bar-val" x="${fx + (bw - 8) / 2}" y="${H - 26 - (2.0 / max) * (H - 40)}">?</text><text class="bar-lab" x="${fx + (bw - 8) / 2}" y="${H - 8}">26</text>`;
+  const mine = plan.risk.region ? `<div class="card block"><strong>What it means for ${esc(plan.place.city || 'you')}</strong><p class="small" style="margin:6px 0 0">${esc(plan.risk.region.name)}: El Niño usually makes it <strong>${esc(plan.risk.region.effect)}</strong> (${esc(plan.risk.region.season)}).</p></div>` : '';
+  body.innerHTML = `<div class="card enso-card block" style="margin-top:12px">
+      <span class="eyebrow">El Niño ${esc(t.current.season)}</span>
+      <h3>${esc(t.current.headline)}</h3>
+      <p class="small" style="margin:0"><strong>${esc(t.current.chance)}</strong> chance of a strong to very strong El Niño. Expected peak: ${esc(t.current.peak)}.</p>
+      <p class="fineprint" style="margin:6px 0 0">${esc(t.current.source)}</p></div>
+    <div class="tracker-facts">${t.facts.map((f) => `<div class="fact"><strong>${esc(f.big)}</strong><span>${esc(f.text)}</span><small>${esc(f.source)}</small></div>`).join('')}</div>
+    <div class="card block"><strong>Every strong El Niño since 1950</strong>
+      <svg class="oni-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peak strength of strong El Niños since 1950">${bars}${forecast}</svg>
+      <p class="small" style="margin:4px 0 0"><span class="key key-vs"></span>Very strong <span class="key key-s"></span>Strong <span class="key key-fc"></span>2026–27 forecast</p>
+      <p class="fineprint">${esc(t.history_note)}</p></div>
+    ${mine}
+    <div class="sources">${t.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>`).join('')}</div>`;
 }
 
 /* ---------------- shell ---------------- */

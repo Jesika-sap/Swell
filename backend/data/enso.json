@@ -3,11 +3,120 @@
   "status": "Strong El Niño likely this winter",
   "detail": "NOAA's October 8, 2026 outlook gives a greater than 83% chance of a strong to very strong El Niño through January to March 2027.",
   "events": [
-    {"date": "2026-09-21", "text": "Governor Newsom declared a state of emergency for storms expected to be of historic severity.", "source": "Stanford Daily", "url": "https://stanforddaily.com/2026/09/23/el-nino-heavy-rain-flooding-bay-area/"},
-    {"date": "2026-10-20", "text": "San Mateo County declared a local El Niño emergency and formed a preparedness task force.", "source": "San Mateo County", "url": "https://www.smcgov.org/ceo/news/county-prepares-winter-storms-urges-residents-do-same"}
+    {
+      "date": "2026-09-21",
+      "text": "Governor Newsom declared a state of emergency for storms expected to be of historic severity.",
+      "source": "Stanford Daily",
+      "url": "https://stanforddaily.com/2026/09/23/el-nino-heavy-rain-flooding-bay-area/"
+    },
+    {
+      "date": "2026-10-20",
+      "text": "San Mateo County declared a local El Niño emergency and formed a preparedness task force.",
+      "source": "San Mateo County",
+      "url": "https://www.smcgov.org/ceo/news/county-prepares-winter-storms-urges-residents-do-same"
+    }
   ],
   "sources": [
-    {"title": "San Mateo County: County prepares for winter storms", "url": "https://www.smcgov.org/ceo/news/county-prepares-winter-storms-urges-residents-do-same"},
-    {"title": "NOAA Climate Prediction Center: ENSO diagnostic discussion", "url": "https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso_advisory/ensodisc.shtml"}
-  ]
+    {
+      "title": "San Mateo County: County prepares for winter storms",
+      "url": "https://www.smcgov.org/ceo/news/county-prepares-winter-storms-urges-residents-do-same"
+    },
+    {
+      "title": "NOAA Climate Prediction Center: ENSO diagnostic discussion",
+      "url": "https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso_advisory/ensodisc.shtml"
+    }
+  ],
+  "tracker": {
+    "current": {
+      "season": "2026–27",
+      "headline": "Strong to very strong El Niño likely",
+      "chance": "more than 83%",
+      "peak": "Winter 2026–27, lasting through January–March 2027",
+      "source": "NOAA Climate Prediction Center, Oct 8, 2026"
+    },
+    "facts": [
+      {
+        "big": "28",
+        "text": "El Niño winters since 1950",
+        "source": "NOAA Oceanic Niño Index"
+      },
+      {
+        "big": "2–7 yrs",
+        "text": "how often El Niño comes back",
+        "source": "NOAA Climate.gov"
+      },
+      {
+        "big": "3",
+        "text": "very strong El Niños: 1982–83, 1997–98, 2015–16",
+        "source": "NOAA Oceanic Niño Index"
+      },
+      {
+        "big": "$5.7T",
+        "text": "lost from world income in the 5 years after the 1997–98 El Niño",
+        "source": "Callahan & Mankin, Science, 2023"
+      }
+    ],
+    "history": [
+      {
+        "season": "1957–58",
+        "peak": 1.81,
+        "strength": "strong"
+      },
+      {
+        "season": "1965–66",
+        "peak": 1.98,
+        "strength": "strong"
+      },
+      {
+        "season": "1972–73",
+        "peak": 2.12,
+        "strength": "strong"
+      },
+      {
+        "season": "1982–83",
+        "peak": 2.23,
+        "strength": "very strong"
+      },
+      {
+        "season": "1987–88",
+        "peak": 1.7,
+        "strength": "strong"
+      },
+      {
+        "season": "1991–92",
+        "peak": 1.71,
+        "strength": "strong"
+      },
+      {
+        "season": "1997–98",
+        "peak": 2.4,
+        "strength": "very strong"
+      },
+      {
+        "season": "2015–16",
+        "peak": 2.75,
+        "strength": "very strong"
+      },
+      {
+        "season": "2023–24",
+        "peak": 2.06,
+        "strength": "strong"
+      }
+    ],
+    "history_note": "Peak Oceanic Niño Index (how many °C warmer than normal the central Pacific got) for every strong and very strong El Niño since 1950.",
+    "sources": [
+      {
+        "title": "NOAA Oceanic Niño Index, via Golden Gate Weather Services",
+        "url": "https://ggweather.com/enso/oni.htm"
+      },
+      {
+        "title": "Callahan & Mankin (2023), Persistent effect of El Niño on global economic growth, Science",
+        "url": "https://www.science.org/doi/10.1126/science.adf2983"
+      },
+      {
+        "title": "NOAA Climate Prediction Center: ENSO diagnostic discussion",
+        "url": "https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso_advisory/ensodisc.shtml"
+      }
+    ]
+  }
 }

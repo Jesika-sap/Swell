@@ -353,3 +353,18 @@ textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surf
 .scan-card .btn { grid-column: 1 / -1; }
 .scan-ic svg { width: 46px; height: 46px; padding: 10px; border-radius: 14px; background: var(--sea); color: var(--sea-ink); }
 .from-scan { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--sea); margin: 0 8px 2px 0; }
+
+/* El Niño tracker */
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.75}
+.tracker-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.tracker-facts .fact{background:var(--card,#fff);border:1px solid var(--line,#e3e8ec);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.tracker-facts .fact strong{font-size:24px;color:var(--sea,#0e7486)}
+.tracker-facts .fact span{font-size:14px}
+.tracker-facts .fact small{font-size:11px;opacity:.65}
+.oni-chart{width:100%;height:auto;margin-top:8px}
+.oni-chart .bar-s{fill:#7fb7c2}.oni-chart .bar-vs{fill:#0e7486}
+.oni-chart .bar-fc{fill:none;stroke:#c2410c;stroke-width:2;stroke-dasharray:4 3}
+.oni-chart .bar-val{font-size:10px;text-anchor:middle;fill:currentColor;font-weight:700}
+.oni-chart .bar-lab{font-size:10px;text-anchor:middle;fill:currentColor;opacity:.7}
+.key{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 8px;vertical-align:middle}
+.key-vs{background:#0e7486}.key-s{background:#7fb7c2}.key-fc{border:2px dashed #c2410c;width:8px;height:8px}

@@ -1,7 +1,10 @@
 #!/bin/bash
 # Double-click this file on a Mac to start Swell's server.
 # The first time, it sets everything up and asks for your Gemini API key.
-cd "$(dirname "$0")/backend" || exit 1
+cd "$(dirname "$0")" || exit 1
+echo "Getting the latest version of Swell..."
+git pull --quiet 2>/dev/null || echo "(Could not check for updates. Using the version on this Mac.)"
+cd backend || exit 1
 
 if [ ! -d .venv ]; then
   echo "Setting up Swell for the first time (about a minute)..."
