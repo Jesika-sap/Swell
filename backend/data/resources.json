@@ -1,6 +1,6 @@
 {
   "note": "Hand-checked resources. Each site lists where the information came from. Sandbag sites change during the season, so the app always shows the source and asks people to confirm before driving there.",
-  "checked": "2026-10-23",
+  "checked": "2026-10-24",
   "statewide": [
     {
       "id": "211",
@@ -130,7 +130,7 @@
       "city": "San Mateo",
       "name": "San Mateo Corporation Yard",
       "address": "1949 Pacific Blvd, San Mateo, CA",
-      "notes": "Self-serve 24/7, Oct 1 to Apr 30. Up to 10 bags per vehicle. San Mateo residents or property owners. Bring a shovel. Pre-filled bags for people with physical limitations: call 650-522-7297.",
+      "notes": "Self-serve 24/7, Oct 1 to Apr 30. Up to 10 bags per vehicle. San Mateo residents or property owners. Bring a shovel. Can't fill bags yourself? Pre-filled bags here, Mon–Fri 7am–3pm: call 650-522-7297.",
       "phone": "650-522-7297",
       "source": "https://www.cityofsanmateo.org/4750/Sandbag-Information"
     },
@@ -167,7 +167,7 @@
       "city": "Redwood City (unincorporated)",
       "name": "Grant Corporation Yard (County)",
       "address": "752 Chestnut St, Redwood City, CA",
-      "notes": "For unincorporated-area residents. Reservation needed for pre-made bags; bring ID. Up to 15 free pre-made bags per season. Bulk sand and bags 24/7.",
+      "notes": "For unincorporated-area residents. Pre-made bags need a reservation and an ID that matches your address. Up to 15 free pre-made bags per season. Bulk sand and bags also available.",
       "phone": "650-363-4103",
       "source": "https://www.smcgov.org/publicworks/sandbags"
     },
@@ -204,7 +204,7 @@
       "city": "Half Moon Bay (Princeton)",
       "name": "Princeton Corporation Yard (County)",
       "address": "203 Cornell Ave, Half Moon Bay, CA",
-      "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.",
+      "notes": "For unincorporated-area residents. Pre-made bags (limited, no reservation; up to 15 per season), plus bulk sand and bags.",
       "phone": "650-728-7993",
       "source": "https://www.smcgov.org/publicworks/sandbags"
     },
@@ -214,7 +214,7 @@
       "city": "La Honda",
       "name": "La Honda Corporation Yard (County)",
       "address": "59 Entrada Way, La Honda, CA",
-      "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.",
+      "notes": "For unincorporated-area residents. Pre-made bags (limited, no reservation; up to 15 per season), plus bulk sand and bags.",
       "phone": "650-747-0341",
       "source": "https://www.smcgov.org/publicworks/sandbags"
     },
@@ -224,7 +224,7 @@
       "city": "Pescadero",
       "name": "Pescadero Corporation Yard (County)",
       "address": "1000 Pescadero Creek Rd, Pescadero, CA",
-      "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.",
+      "notes": "For unincorporated-area residents. Pre-made bags (limited, no reservation; up to 15 per season), plus bulk sand and bags.",
       "phone": "650-879-0202",
       "source": "https://www.smcgov.org/publicworks/sandbags"
     }

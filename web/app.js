@@ -925,7 +925,7 @@ async function renderTracker(body) {
   body.innerHTML = `<div class="card enso-card block" style="margin-top:12px">
       <span class="eyebrow">El Niño ${esc(t.current.season)}</span>
       <h3>${esc(t.current.headline)}</h3>
-      <p class="small" style="margin:0"><strong>${esc(t.current.chance)}</strong> chance of a strong to very strong El Niño. Expected peak: ${esc(t.current.peak)}.</p>
+      <p class="small" style="margin:0"><strong>${esc(t.current.chance)}</strong> chance of a strong to very strong El Niño. Timing: ${esc(t.current.peak)}.</p>
       <p class="fineprint" style="margin:6px 0 0">${esc(t.current.source)}</p></div>
     <div class="tracker-facts">${t.facts.map((f) => `<div class="fact"><strong>${esc(f.big)}</strong><span>${esc(f.text)}</span><small>${esc(f.source)}</small></div>`).join('')}</div>
     <div class="card block"><strong>Every strong El Niño since 1950</strong>

@@ -1,13 +1,13 @@
 {
-  "updated": "2026-10-21",
+  "updated": "2026-10-24",
   "status": "Strong El Niño likely this winter",
   "detail": "NOAA's October 8, 2026 outlook gives a greater than 83% chance of a strong to very strong El Niño through January to March 2027.",
   "events": [
     {
       "date": "2026-09-21",
-      "text": "Governor Newsom declared a state of emergency for storms expected to be of historic severity.",
-      "source": "Stanford Daily",
-      "url": "https://stanforddaily.com/2026/09/23/el-nino-heavy-rain-flooding-bay-area/"
+      "text": "Governor Newsom declared a state of emergency to get California ready for El Niño storms, flooding and power outages.",
+      "source": "Office of the Governor",
+      "url": "https://www.gov.ca.gov/2026/09/21/governor-newsom-proclaims-state-of-emergency-to-bolster-statewide-el-nino-preparedness-protect-california/"
     },
     {
       "date": "2026-10-20",
@@ -31,7 +31,7 @@
       "season": "2026–27",
       "headline": "Strong to very strong El Niño likely",
       "chance": "more than 83%",
-      "peak": "Winter 2026–27, lasting through January–March 2027",
+      "peak": "still strengthening through the end of 2026, and likely to last through January–March 2027",
       "source": "NOAA Climate Prediction Center, Oct 8, 2026"
     },
     "facts": [
