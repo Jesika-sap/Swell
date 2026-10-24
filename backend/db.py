@@ -74,6 +74,19 @@ def init():
         sql = s.strip()
         if sql:
             execute(sql)
+    _migrate()
+
+
+def _columns(table):
+    if _IS_PG:
+        return {r["column_name"] for r in query("SELECT column_name FROM information_schema.columns WHERE table_name = ?", (table,))}
+    return {r["name"] for r in query(f"PRAGMA table_info({table})")}
+
+
+def _migrate():
+    """Add columns that older databases don't have yet."""
+    if "community_id" not in _columns("reports"):
+        execute("ALTER TABLE reports ADD COLUMN community_id TEXT")
 
 
 # ---------- cache helpers ----------

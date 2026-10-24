@@ -16,7 +16,7 @@ struct MapScreen: View {
             Map(position: $position) {
                 Marker(plan.label ?? "Home", systemImage: "house.fill", coordinate: .init(latitude: plan.lat, longitude: plan.lon))
                     .tint(Theme.ocean)
-                ForEach(plan.help.sandbags ?? []) { s in
+                ForEach(plan.isDrought ? [SandbagSite]() : (plan.help.sandbags ?? [])) { s in
                     Marker("Sandbags: \(s.name)", systemImage: "bag.fill", coordinate: .init(latitude: s.lat, longitude: s.lon))
                         .tint(.orange)
                 }
@@ -43,7 +43,7 @@ struct MapScreen: View {
             }
             .sheet(item: $selected) { r in ReportDetail(report: r).presentationDetents([.medium]) }
             .sheet(isPresented: $reporting, onDismiss: { Task { await loadReports(plan) } }) {
-                ReportSheet(lat: center?.latitude ?? plan.lat, lon: center?.longitude ?? plan.lon, county: plan.place.county)
+                ReportSheet(lat: center?.latitude ?? plan.lat, lon: center?.longitude ?? plan.lon)
             }
         }
     }
@@ -61,6 +61,9 @@ struct ReportDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(report.title).font(.title2.bold())
+            if let name = report.communityName {
+                Text(report.official == true ? "Official update from \(name)" : "Posted in \(name)").font(.subheadline.bold())
+            }
             Text("\(report.confirmations + (confirmed ? 1 : 0)) people confirmed this").foregroundStyle(.secondary)
             if let note = report.note, !note.isEmpty { Text(note) }
             Button {
@@ -74,11 +77,17 @@ struct ReportDetail: View {
 }
 
 /// Neighbors report flooding with a photo. AI suggests the label; the person can change it.
+/// Reports go to a group you can post in: any neighborhood or family group you're in,
+/// or a county or city community if you're a verified official there.
 struct ReportSheet: View {
     let lat: Double
     let lon: Double
-    let county: String?
+    var communityId: String? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var groups: [CommunitySummary] = []
+    @State private var signedIn = true
+    @State private var loaded = false
+    @State private var groupId = ""
     @State private var item: PhotosPickerItem?
     @State private var image: UIImage?
     @State private var photoData: String?
@@ -97,6 +106,31 @@ struct ReportSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if loaded && !signedIn {
+                    Text("Create a free account in the Community tab to post. Storm reports go to a neighborhood or family group, so the people near you see them.")
+                        .foregroundStyle(.secondary)
+                } else if loaded && groups.isEmpty {
+                    Text("County and city communities are for official updates. To post a storm report, start or join a neighborhood or family group in the Community tab.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    form
+                }
+            }
+            .navigationTitle("Report a storm problem")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .onChange(of: item) { _, newItem in Task { await loadPhoto(newItem) } }
+            .task { await loadGroups() }
+        }
+    }
+
+    @ViewBuilder
+    private var form: some View {
+                Section("Post to") {
+                    Picker("Group", selection: $groupId) {
+                        ForEach(groups) { g in Text(g.name).tag(g.id) }
+                    }
+                }
                 Section {
                     PhotosPicker(selection: $item, matching: .images) {
                         if let image {
@@ -107,7 +141,7 @@ struct ReportSheet: View {
                     }
                     if analyzing { HStack { ProgressView(); Text("AI is looking at your photo…") } }
                     if let aiNote { Label(aiNote, systemImage: "sparkles").foregroundStyle(Theme.sea) }
-                } footer: { Text("People in your communities will see it. Don’t take photos in dangerous spots.") }
+                } footer: { Text("Everyone in the group you pick will see it. Don’t take photos in dangerous spots.") }
 
                 Section("What is it?") {
                     Picker("Kind", selection: $kind) { ForEach(kinds, id: \.0) { Text($0.1).tag($0.0) } }
@@ -121,13 +155,20 @@ struct ReportSheet: View {
                 Button { Task { await send() } } label: {
                     if sending { ProgressView() } else { Text("Post report").bold() }
                 }
-                .disabled(sending)
+                .disabled(sending || groupId.isEmpty)
+    }
+
+    private func loadGroups() async {
+        if let list = try? await APIClient.shared.communities() {
+            signedIn = list.account != nil
+            groups = list.mine.filter { $0.canPost == true }
+            if let communityId, groups.contains(where: { $0.id == communityId }) {
+                groupId = communityId
+            } else {
+                groupId = groups.first?.id ?? ""
             }
-            .navigationTitle("Report a storm problem")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-            .onChange(of: item) { _, newItem in Task { await loadPhoto(newItem) } }
         }
+        loaded = true
     }
 
     private func loadPhoto(_ newItem: PhotosPickerItem?) async {
@@ -151,7 +192,8 @@ struct ReportSheet: View {
         sending = true
         defer { sending = false }
         do {
-            try await APIClient.shared.postReport(lat: lat, lon: lon, kind: kind, title: title, severity: severity, photo: photoData, aiChecked: aiChecked, county: county)
+            try await APIClient.shared.postReport(communityId: groupId, lat: lat, lon: lon, kind: kind, title: title, severity: severity,
+                                                  photo: photoData, aiChecked: aiChecked)
             dismiss()
         } catch {
             errorText = error.localizedDescription

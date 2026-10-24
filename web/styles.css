@@ -384,6 +384,7 @@ textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surf
 .comm-ic.big { width: 48px; height: 48px; border-radius: 14px; }
 .comm-ic.k-city { background: #e8e6f7; color: #4b3f9e; }
 .comm-ic.k-family { background: var(--elev-soft); color: var(--elev); }
+.comm-ic.k-neighborhood { background: #e3f1e6; color: #2f7a43; }
 .chev-r { color: var(--muted); width: 18px; height: 18px; }
 .pill-btn { background: var(--sea); color: var(--sea-ink); border: 0; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; flex: none; }
 .fam-card h3 { margin: 0 0 4px; }

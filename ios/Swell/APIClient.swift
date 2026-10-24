@@ -113,10 +113,11 @@ final class APIClient {
         try await post("/api/reports/analyze", ["photo": photo])
     }
 
-    func postReport(lat: Double, lon: Double, kind: String, title: String, severity: Int, photo: String?, aiChecked: Bool, county: String?) async throws {
-        var body: [String: Any] = ["lat": lat, "lon": lon, "kind": kind, "title": title, "severity": severity, "ai_checked": aiChecked]
+    /// Post a report to one of your groups (or, for verified officials, to a county or city).
+    func postReport(communityId: String, lat: Double, lon: Double, kind: String, title: String, severity: Int, photo: String?, aiChecked: Bool) async throws {
+        var body: [String: Any] = ["community_id": communityId, "lat": lat, "lon": lon, "kind": kind, "title": title,
+                                   "severity": severity, "ai_checked": aiChecked]
         if let photo { body["photo"] = photo }
-        if let county { body["county"] = county }
         _ = try await request("/api/reports", method: "POST", body: body)
     }
 
@@ -147,16 +148,13 @@ final class APIClient {
 
     func communities() async throws -> CommunityList { try await get("/api/communities") }
 
-    func joinCommunity(key: String) async throws -> CommunitySummary {
-        try await post("/api/communities/join", ["key": key])
-    }
-
-    func joinFamily(code: String) async throws -> CommunitySummary {
+    func joinGroup(code: String) async throws -> CommunitySummary {
         try await post("/api/communities/join", ["code": code])
     }
 
-    func createFamily(name: String) async throws -> CommunitySummary {
-        try await post("/api/communities", ["name": name])
+    /// kind is "neighborhood" or "family".
+    func createGroup(kind: String, name: String) async throws -> CommunitySummary {
+        try await post("/api/communities", ["kind": kind, "name": name])
     }
 
     func community(_ id: String) async throws -> CommunityDetail { try await get("/api/communities/\(id)") }

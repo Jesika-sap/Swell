@@ -2,14 +2,15 @@ import SwiftUI
 import UIKit
 import MapKit
 
-/// Communities: your county, your city, and private family groups (any size).
-/// Inside one you see storm reports from that area. You need an account to join.
+/// Communities. With an account you're added to your county and city, where only
+/// verified officials post updates. Neighborhood and family groups are private,
+/// joined with an invite code, and everyone in them can post storm reports.
 struct CommunityView: View {
     @Environment(AppStore.self) private var store
     @State private var list: CommunityList?
     @State private var errorText: String?
     @State private var accountMode: AccountMode?
-    @State private var showNewFamily = false
+    @State private var newGroupKind: GroupKind?
     @State private var showJoinCode = false
     @State private var reporting = false
     @State private var confirmLogout = false
@@ -33,11 +34,11 @@ struct CommunityView: View {
         .task { await load() }
         .refreshable { await load() }
         .sheet(item: $accountMode, onDismiss: { Task { await load() } }) { mode in AccountSheet(mode: mode) }
-        .sheet(isPresented: $showNewFamily, onDismiss: { Task { await load() } }) { NewFamilySheet() }
+        .sheet(item: $newGroupKind, onDismiss: { Task { await load() } }) { kind in NewGroupSheet(kind: kind) }
         .sheet(isPresented: $showJoinCode, onDismiss: { Task { await load() } }) { JoinCodeSheet() }
         .sheet(isPresented: $reporting) {
             if let plan = store.plan {
-                ReportSheet(lat: plan.lat, lon: plan.lon, county: plan.place.county)
+                ReportSheet(lat: plan.lat, lon: plan.lon)
             }
         }
         .confirmationDialog("Log out?", isPresented: $confirmLogout, titleVisibility: .visible) {
@@ -50,7 +51,7 @@ struct CommunityView: View {
     private var signedOut: some View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Join your county and your city to see storm reports from people near you, and start a private group to check on your family.")
+                Text("With a free account, you’re added to your county and city, where officials post updates. Then start or join a neighborhood or family group, where everyone can post storm reports.")
                     .foregroundStyle(.secondary)
                 Button { accountMode = .signup } label: { Text("Create a free account").bold().frame(maxWidth: .infinity) }
                     .buttonStyle(.borderedProminent).controlSize(.large)
@@ -71,37 +72,33 @@ struct CommunityView: View {
                 Button("Log out") { confirmLogout = true }.font(.subheadline)
             }
         }
-        Section("Your communities") {
+        Section {
             if list.mine.isEmpty {
-                Text("You haven’t joined any yet. Join your county or city below.").foregroundStyle(.secondary)
+                Text("Make a plan for your home first, and you’ll be added to your county and city.").foregroundStyle(.secondary)
             }
             ForEach(list.mine) { c in
                 NavigationLink(value: c) { CommunityRow(kind: c.kind, name: c.name, detail: "\(CommunityKind.label(c.kind)) · \(c.members) \(c.members == 1 ? "member" : "members")") }
             }
-        }
-        if !list.suggested.isEmpty {
-            Section("Join near your places") {
-                ForEach(list.suggested) { s in
-                    HStack {
-                        CommunityRow(kind: s.kind, name: s.name, detail: CommunityKind.label(s.kind))
-                        Spacer()
-                        Button("Join") { Task { await join(s.key) } }
-                            .buttonStyle(.borderedProminent).controlSize(.small).clipShape(Capsule())
-                    }
-                }
-            }
+        } header: {
+            Text("Your communities")
+        } footer: {
+            Text("Officials post updates in your county and city. In neighborhood and family groups, everyone can post.")
         }
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Family group").font(.headline)
-                Text("A private group for your family or friends, as big as you want. See each other’s places and checklist progress, and tap “I’m safe” after a storm.")
+                Text("Start a group").font(.headline)
+                Text("**Neighborhood group:** for your street or block. Everyone in it can post storm reports, like a flooded corner or a blocked drain.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Text("**Family group:** private, as big as you want. See each other’s places and checklist progress, and tap “I’m safe” after a storm.")
                     .font(.subheadline).foregroundStyle(.secondary)
                 HStack {
-                    Button { showNewFamily = true } label: { Text("Start a group").frame(maxWidth: .infinity) }
+                    Button { newGroupKind = .neighborhood } label: { Text("Neighborhood").frame(maxWidth: .infinity) }
                         .buttonStyle(.borderedProminent)
-                    Button { showJoinCode = true } label: { Text("Join with a code").frame(maxWidth: .infinity) }
-                        .buttonStyle(.bordered)
+                    Button { newGroupKind = .family } label: { Text("Family").frame(maxWidth: .infinity) }
+                        .buttonStyle(.borderedProminent)
                 }
+                Button { showJoinCode = true } label: { Text("Join with a code").frame(maxWidth: .infinity) }
+                    .buttonStyle(.bordered)
             }
             .padding(.vertical, 6)
         }
@@ -121,14 +118,6 @@ struct CommunityView: View {
         }
     }
 
-    private func join(_ key: String) async {
-        do {
-            _ = try await APIClient.shared.joinCommunity(key: key)
-            await load()
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
 }
 
 struct CommunityRow: View {
@@ -136,12 +125,20 @@ struct CommunityRow: View {
     let name: String
     let detail: String
 
+    private var color: Color {
+        switch kind {
+        case "family": return .orange
+        case "neighborhood": return .green
+        default: return Theme.sea
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: CommunityKind.symbol(kind))
-                .foregroundStyle(kind == "family" ? Color.orange : Theme.sea)
+                .foregroundStyle(color)
                 .frame(width: 36, height: 36)
-                .background((kind == "family" ? Color.orange : Theme.sea).opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).bold()
                 Text(detail).font(.caption).foregroundStyle(.secondary)
@@ -168,11 +165,12 @@ struct CommunityDetailView: View {
                         .listRowInsets(EdgeInsets())
                 }
                 if d.kind == "family" { familySection(d) }
+                if let code = d.inviteCode { inviteSection(code, family: d.kind == "family") }
                 Section {
                     if d.reports.isEmpty {
-                        Text(d.kind == "family"
-                             ? "No storm reports near your family’s places right now."
-                             : "No storm reports here right now. If you see flooding, a clogged drain or a fallen tree, report it so your neighbors know.")
+                        Text(isGroup(d)
+                             ? "No storm reports yet. If you see flooding, a clogged drain or a fallen tree, post it so \(d.kind == "family" ? "your family knows" : "your neighbors know")."
+                             : "No official updates right now.")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(d.reports) { r in
@@ -180,16 +178,26 @@ struct CommunityDetailView: View {
                     }
                 } header: {
                     HStack {
-                        Text("Storm reports")
+                        Text(isGroup(d) ? "Storm reports from this group" : "Official updates")
                         Spacer()
-                        Button("+ Report") { reporting = true }.font(.subheadline.bold()).textCase(nil)
+                        if d.canPost == true {
+                            Button("+ Post") { reporting = true }.font(.subheadline.bold()).textCase(nil)
+                        }
+                    }
+                } footer: {
+                    if !isGroup(d) {
+                        Text(d.canPost == true
+                             ? "You’re a verified official here, so you can post updates everyone in the area will see."
+                             : "Only verified officials, like the county’s emergency office or the city, can post here. To share what you see, post in a neighborhood or family group.")
                     }
                 }
-                Section {
-                    Button(d.kind == "family" ? "Leave this group" : "Leave this community", role: .destructive) {
-                        Task {
-                            try? await APIClient.shared.leaveCommunity(d.id)
-                            dismiss()
+                if isGroup(d) {
+                    Section {
+                        Button("Leave this group", role: .destructive) {
+                            Task {
+                                try? await APIClient.shared.leaveCommunity(d.id)
+                                dismiss()
+                            }
                         }
                     }
                 }
@@ -205,8 +213,24 @@ struct CommunityDetailView: View {
         .sheet(item: $selected, onDismiss: { Task { await load() } }) { r in ReportDetail(report: r).presentationDetents([.medium]) }
         .sheet(isPresented: $reporting, onDismiss: { Task { await load() } }) {
             if let plan = store.plan {
-                ReportSheet(lat: plan.lat, lon: plan.lon, county: plan.place.county)
+                ReportSheet(lat: plan.lat, lon: plan.lon, communityId: summary.id)
             }
+        }
+    }
+
+    private func isGroup(_ d: CommunityDetail) -> Bool { d.kind == "family" || d.kind == "neighborhood" }
+
+    @ViewBuilder
+    private func inviteSection(_ code: String, family: Bool) -> some View {
+        Section {
+            HStack {
+                Text("Invite code").font(.caption).foregroundStyle(.secondary)
+                Text(code).font(.title3.monospaced().bold())
+                Spacer()
+                Button("Copy") { UIPasteboard.general.string = code }
+            }
+        } footer: {
+            Text("Send this code to \(family ? "family" : "neighbors"). They create a free account and tap “Join with a code.”")
         }
     }
 
@@ -243,16 +267,6 @@ struct CommunityDetailView: View {
                 }
             } label: { Label("I’m safe", systemImage: "checkmark.shield").bold().frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent).controlSize(.large)
-            if let code = d.inviteCode {
-                HStack {
-                    Text("Invite code").font(.caption).foregroundStyle(.secondary)
-                    Text(code).font(.title3.monospaced().bold())
-                    Spacer()
-                    Button("Copy") { UIPasteboard.general.string = code }
-                }
-                Text("Send this code to family. They create an account and tap “Join with a code.”")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -343,7 +357,13 @@ struct AccountSheet: View {
     }
 }
 
-struct NewFamilySheet: View {
+enum GroupKind: String, Identifiable {
+    case neighborhood, family
+    var id: String { rawValue }
+}
+
+struct NewGroupSheet: View {
+    let kind: GroupKind
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var errorText: String?
@@ -352,16 +372,20 @@ struct NewFamilySheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Group name, e.g. Sapkota family", text: $name)
-                } footer: { Text("Add as many people as you want. You’ll get a code to share with them.") }
+                    TextField(kind == .family ? "Group name, e.g. Sapkota family" : "Group name, e.g. Murchison Drive neighbors", text: $name)
+                } footer: {
+                    Text(kind == .family
+                         ? "Add as many people as you want. You’ll get a code to share with them."
+                         : "Invite the neighbors on your street or block. Everyone in the group can post storm reports.")
+                }
                 if let errorText { Text(errorText).foregroundStyle(.red) }
                 Button("Create group") {
                     Task {
-                        do { _ = try await APIClient.shared.createFamily(name: name); dismiss() } catch { errorText = error.localizedDescription }
+                        do { _ = try await APIClient.shared.createGroup(kind: kind.rawValue, name: name); dismiss() } catch { errorText = error.localizedDescription }
                     }
                 }.bold()
             }
-            .navigationTitle("Start a family group")
+            .navigationTitle(kind == .family ? "Start a family group" : "Start a neighborhood group")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }
@@ -379,15 +403,15 @@ struct JoinCodeSheet: View {
                 Section {
                     TextField("Invite code, e.g. K7Q2MX", text: $code)
                         .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                } footer: { Text("Ask the person who made the group for its 6-letter code.") }
+                } footer: { Text("Ask the person who made the neighborhood or family group for its 6-letter code.") }
                 if let errorText { Text(errorText).foregroundStyle(.red) }
                 Button("Join") {
                     Task {
-                        do { _ = try await APIClient.shared.joinFamily(code: code); dismiss() } catch { errorText = error.localizedDescription }
+                        do { _ = try await APIClient.shared.joinGroup(code: code); dismiss() } catch { errorText = error.localizedDescription }
                     }
                 }.bold()
             }
-            .navigationTitle("Join a family group")
+            .navigationTitle("Join a group")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }

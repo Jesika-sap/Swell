@@ -49,6 +49,8 @@ struct HelpView: View {
                 if plan.inUS && !plan.isDrought {
                 Section("Sandbags, closest first") {
                     let sites = plan.help.sandbags ?? []
+                    Text("Sandbags are heavy bags of sand. Stacked in front of doors and garage openings, they keep shallow floodwater out.")
+                        .font(.caption).foregroundStyle(.secondary)
                     if !sites.isEmpty {
                         ForEach(sites) { s in
                             VStack(alignment: .leading, spacing: 4) {

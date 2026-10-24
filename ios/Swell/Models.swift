@@ -197,6 +197,8 @@ struct StormReport: Codable, Identifiable {
     let hasPhoto: Int?
     let createdAt: String
     var kindLabel: String?
+    var communityName: String?
+    var official: Bool?
 }
 
 struct PhotoAnalysis: Codable {
@@ -390,11 +392,14 @@ struct AccountReply: Codable {
 
 struct CommunitySummary: Codable, Identifiable, Hashable {
     let id: String
-    let kind: String          // county, city, family
+    let kind: String          // county, city, neighborhood, family
     let name: String
     let members: Int
-    let maxMembers: Int?
     let owner: Bool
+    var role: String?         // owner, member, official
+    var canPost: Bool?        // officials in county/city, everyone in groups
+
+    var isGroup: Bool { kind == "family" || kind == "neighborhood" }
 }
 
 struct SuggestedCommunity: Codable, Identifiable {
@@ -433,8 +438,9 @@ struct CommunityDetail: Codable {
     let kind: String
     let name: String
     let members: Int
-    let maxMembers: Int?
     let owner: Bool
+    var role: String?
+    var canPost: Bool?
     let inviteCode: String?
     let people: [Member]?
     let reports: [StormReport]
@@ -459,8 +465,9 @@ struct FamilyPin: Codable, Identifiable {
 enum CommunityKind {
     static func label(_ kind: String) -> String {
         switch kind {
-        case "county": return "County"
-        case "city": return "City"
+        case "county": return "County · official updates"
+        case "city": return "City · official updates"
+        case "neighborhood": return "Neighborhood group"
         default: return "Private family group"
         }
     }
@@ -469,6 +476,7 @@ enum CommunityKind {
         switch kind {
         case "county": return "mountain.2"
         case "city": return "building.2"
+        case "neighborhood": return "house.and.flag"
         default: return "person.3"
         }
     }

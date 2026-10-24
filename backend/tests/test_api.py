@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import date
 
 HERE = os.path.dirname(__file__)
@@ -174,19 +175,32 @@ class ApiTests(unittest.TestCase):
         photo = "data:image/jpeg;base64," + "A" * 400
         a = self.c.post("/api/reports/analyze", json={"photo": photo}, headers=DEV).get_json()
         self.assertEqual(a["kind"], "drain")
-        res = self.c.post("/api/reports", json={"lat": 37.59, "lon": -122.38, "kind": a["kind"], "title": a["title"],
-                                                "severity": a["severity"], "photo": photo, "ai_checked": True}, headers=DEV)
+        report = {"lat": 37.59, "lon": -122.38, "kind": a["kind"], "title": a["title"], "severity": a["severity"],
+                  "photo": photo, "ai_checked": True}
+        # Posting needs an account and a group.
+        self.assertEqual(self.c.post("/api/reports", json=report, headers=DEV).status_code, 400)
+        R = {"X-Device-Id": "reporter-device-r1"}
+        N = {"X-Device-Id": "neighbor-device-n1"}
+        for h, e in ((R, "r1@example.com"), (N, "n1@example.com")):
+            self.c.post("/api/account/signup", json={"name": "Neighbor", "email": e, "password": "password123"}, headers=h)
+        grp = self.c.post("/api/communities", json={"kind": "neighborhood", "name": "Murchison Dr"}, headers=R).get_json()
+        self.assertTrue(grp["can_post"])
+        res = self.c.post("/api/reports", json={**report, "community_id": grp["id"]}, headers=R)
         self.assertEqual(res.status_code, 201)
         rid = res.get_json()["id"]
-        near = self.c.get("/api/reports?lat=37.6&lon=-122.39").get_json()
+        # Group posts are only on the map for members of that group.
+        self.assertNotIn(rid, [r["id"] for r in self.c.get("/api/reports?lat=37.6&lon=-122.39", headers=N).get_json()])
+        code = self.c.get(f"/api/communities/{grp['id']}", headers=R).get_json()["invite_code"]
+        self.c.post("/api/communities/join", json={"code": code}, headers=N)
+        near = self.c.get("/api/reports?lat=37.6&lon=-122.39", headers=N).get_json()
         self.assertIn(rid, [r["id"] for r in near])
         self.assertNotIn("photo", near[0])
-        far = self.c.get("/api/reports?lat=34.05&lon=-118.24").get_json()
+        far = self.c.get("/api/reports?lat=34.05&lon=-118.24", headers=N).get_json()
         self.assertNotIn(rid, [r["id"] for r in far])
         self.assertEqual(self.c.post(f"/api/reports/{rid}/confirm", headers=OTHER).get_json()["confirmations"], 1)
         self.assertEqual(self.c.post(f"/api/reports/{rid}/confirm", headers=OTHER).get_json()["confirmations"], 1)  # once per device
         self.assertTrue(self.c.get(f"/api/reports/{rid}/photo").get_json()["photo"].startswith("data:image/jpeg"))
-        bad = self.c.post("/api/reports", json={"lat": 37.59, "lon": -122.38, "photo": "data:text/html,hi"}, headers=DEV)
+        bad = self.c.post("/api/reports", json={**report, "community_id": grp["id"], "photo": "data:text/html,hi"}, headers=R)
         self.assertEqual(bad.status_code, 400)
 
     def test_cache_avoids_repeat_calls(self):
@@ -347,16 +361,29 @@ class AccountCommunityTests(unittest.TestCase):
         b = {"X-Device-Id": d["device_id"]}
         self.assertEqual([p["id"] for p in c.get("/api/plans", headers=b).get_json()], [plan["id"]])
 
-        # County and city communities come from your own plans.
-        lst = c.get("/api/communities", headers=b).get_json()
-        keys = {s["kind"]: s["key"] for s in lst["suggested"]}
-        self.assertIn("county", keys)
-        self.assertEqual(c.post("/api/communities/join", json={"key": "county:NY:Kings"}, headers=b).status_code, 400)
-        county = c.post("/api/communities/join", json={"key": keys["county"]}, headers=b).get_json()
-        c.post("/api/reports", json={"lat": plan["lat"] + 0.01, "lon": plan["lon"], "kind": "drain", "title": "Clogged drain",
-                                     "severity": 2, "county": plan["place"]["county"]}, headers=OTHER)
+        # Your county and city communities are joined automatically, but only officials post there.
+        mine = {x["kind"]: x for x in c.get("/api/communities", headers=b).get_json()["mine"]}
+        self.assertIn("county", mine)
+        self.assertIn("city", mine)
+        county = mine["county"]
+        self.assertFalse(county["can_post"])
+        self.assertEqual(c.post("/api/reports", json={"lat": plan["lat"], "lon": plan["lon"], "kind": "road", "title": "Road closed",
+                                                      "community_id": county["id"]}, headers=b).status_code, 400)
+        self.assertEqual(c.post(f"/api/communities/{county['id']}/leave", headers=b).status_code, 400)
+        off = {"X-Device-Id": "county-oem-device"}
+        c.post("/api/account/signup", json={"name": "County OES", "email": "oes@smcgov.example", "password": "password123"}, headers=off)
+        self.assertEqual(c.post(f"/api/communities/{county['id']}/officials", json={"email": "oes@smcgov.example"}).status_code, 404)
+        with mock.patch.object(server.config, "ADMIN_TOKEN", "t0ken"):
+            ok = c.post(f"/api/communities/{county['id']}/officials", json={"email": "oes@smcgov.example"}, headers={"X-Admin-Token": "t0ken"})
+        self.assertEqual(ok.status_code, 200)
+        res = c.post("/api/reports", json={"lat": plan["lat"] + 0.01, "lon": plan["lon"], "kind": "road", "title": "Road closed",
+                                           "community_id": county["id"]}, headers=off)
+        self.assertEqual(res.status_code, 201)
         detail = c.get(f"/api/communities/{county['id']}", headers=b).get_json()
-        self.assertEqual(detail["reports"][0]["title"], "Clogged drain")
+        self.assertEqual(detail["reports"][0]["title"], "Road closed")
+        self.assertTrue(detail["reports"][0]["official"])
+        # Official updates show on everyone's map nearby, even without an account.
+        self.assertIn("Road closed", [r["title"] for r in c.get(f"/api/reports?lat={plan['lat']}&lon={plan['lon']}", headers=OTHER).get_json()])
         self.assertEqual(c.get(f"/api/communities/{county['id']}", headers=OTHER).status_code, 400)  # no account
 
         # Family group: invite code, no size limit, "I'm safe".

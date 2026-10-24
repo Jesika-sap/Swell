@@ -372,8 +372,9 @@ function renderHelp() {
       <a class="btn" href="${esc(h.alert_system.url)}" target="_blank" rel="noopener">Sign up</a>
     </section>` : ''}
 
-    <section class="block">
+    ${plan.risk.hazard === 'drought' ? '' : `<section class="block">
       <div class="section-head"><h3>Sandbags</h3>${sb.length ? `<span class="muted small">Checked ${esc(fmtDay(h.checked))}</span>` : ''}</div>
+      <p class="small muted" style="margin:-4px 0 10px">Sandbags are heavy bags of sand. Stacked in front of doors and garage openings, they keep shallow floodwater out.</p>
       ${sb.length ? `<ul class="res-list">${sb.map((s) => `<li>
         <div class="res-top"><strong>${esc(s.name)}</strong><span class="miles">${s.miles} mi</span></div>
         <p>${esc(s.address)}</p><p>${esc(s.notes)}</p>
@@ -387,7 +388,7 @@ function renderHelp() {
       <p class="fineprint">AI found these from the sources below. Confirm with your city before you go.</p>
       <div class="sources">${h.ai.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>`).join('')}</div>`
       : `<div class="notice">${intl ? 'Sandbag sites are listed for California for now.' : 'We haven’t checked sandbag sites for this area yet. Call 211 or search your city’s public works page.'}</div>`}
-    </section>
+    </section>`}
 
     ${h.county && h.county.length ? `<section class="block"><div class="section-head"><h3>${esc(plan.place.county)} County</h3></div>
       <ul class="res-list">${h.county.map(resHTML).join('')}</ul></section>` : ''}
@@ -558,7 +559,7 @@ function setAcctMode(m) {
   acctMode = m;
   const signup = m === 'signup';
   $('#acctTitle').textContent = signup ? 'Create your account' : 'Welcome back';
-  $('#acctLead').textContent = signup ? 'Your plans follow you to any phone or computer, and you can join your county, your city and a private family group.' : 'Log in to see your plans and communities.';
+  $('#acctLead').textContent = signup ? 'Your plans follow you to any phone or computer. You’re added to your county and city, and you can start neighborhood and family groups.' : 'Log in to see your plans and communities.';
   $('#nameWrap').hidden = !signup;
   $('#pwHint').hidden = !signup;
   $('#acctPw').setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
@@ -581,7 +582,7 @@ $('#acctForm').addEventListener('submit', async (e) => {
 
 function openAccountSheet(mode = 'signup') {
   openSheet(`<h2 id="sheetTitle">${mode === 'signup' ? 'Create your account' : 'Log in'}</h2>
-    <p class="muted small">${mode === 'signup' ? 'Your plans on this device move into your account. Then you can join communities and family groups.' : 'Plans you made on this device move into your account.'}</p>
+    <p class="muted small">${mode === 'signup' ? 'Your plans on this device move into your account. You’re added to your county and city, and you can start neighborhood and family groups.' : 'Plans you made on this device move into your account.'}</p>
     ${accountFormHTML(mode, 'sh')}
     <button class="btn btn-primary btn-wide" type="button" id="shGo">${mode === 'signup' ? 'Create account' : 'Log in'}</button>
     <button class="link-btn" type="button" id="shSwitch" style="margin-top:12px">${mode === 'signup' ? 'Already have an account? Log in' : 'New here? Create an account'}</button>`);
@@ -627,9 +628,10 @@ async function renderMap() {
   }
   layer.clearLayers();
   L.marker([plan.lat, plan.lon], { icon: pinIcon('pin-home', ICON.home) }).addTo(layer).bindPopup(`<b>${esc(plan.label)}</b>`);
-  (plan.help.sandbags || []).forEach((s) => L.marker([s.lat, s.lon], { icon: pinIcon('pin-bag', ICON.bag) }).addTo(layer)
+  const bags = plan.risk.hazard === 'drought' ? [] : (plan.help.sandbags || []);
+  bags.forEach((s) => L.marker([s.lat, s.lon], { icon: pinIcon('pin-bag', ICON.bag) }).addTo(layer)
     .bindPopup(`<b>Sandbags: ${esc(s.name)}</b><br>${esc(s.address)}<br><a href="${mapsLink(s.address)}" target="_blank" rel="noopener">Directions</a>`));
-  $('#mapCard').innerHTML = `<span><i style="background:var(--ocean)"></i>Your place</span><span><i style="background:#b86a00"></i>Sandbags</span><span><i style="background:#c0392b"></i>Storm reports</span>`;
+  $('#mapCard').innerHTML = `<span><i style="background:var(--ocean)"></i>Your place</span>${bags.length ? '<span><i style="background:#b86a00"></i>Sandbags</span>' : ''}<span><i style="background:#c0392b"></i>Storm reports</span>`;
   let reports = [];
   try { reports = await api(`/api/reports?lat=${plan.lat}&lon=${plan.lon}&miles=10`); } catch (e) { reports = []; }
   reportPins(layer, reports);
@@ -639,11 +641,13 @@ $('#reportFab').addEventListener('click', () => openReportForm(() => renderMap()
 
 /* ---------------- communities ---------------- */
 const KINDS = { flooding: 'Flooded street', drain: 'Clogged storm drain', landslide: 'Landslide or mudslide', tree: 'Fallen tree', power: 'Downed power line', road: 'Road damage', other: 'Other storm problem' };
-const COMM_KIND = { county: 'County', city: 'City', family: 'Private family group' };
+const COMM_KIND = { county: 'County · official updates', city: 'City · official updates', neighborhood: 'Neighborhood group', family: 'Private family group' };
+const GROUP_KINDS = ['family', 'neighborhood'];
 const COMM_ICON = {
   county: '<path d="M3 20l5-14 5 8 3-4 5 10z"/>',
   city: '<path d="M4 21V9l5-3v15M9 21V4l6 3v14M15 21v-9l5 2v7"/>',
-  family: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0M14 20a4.5 4.5 0 0 1 7-3.7"/>'
+  family: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0M14 20a4.5 4.5 0 0 1 7-3.7"/>',
+  neighborhood: '<path d="M3 11l5-4 5 4v9H3zM13 11l4-3 4 3v9h-8"/><path d="M7 20v-4h2v4"/>'
 };
 let commOpen = null;
 function milesBetween(a, b, c, d) {
@@ -665,7 +669,7 @@ async function renderCommunity() {
   state.account = d.account; save();
   if (!d.account) {
     page.innerHTML = `<h2>Community</h2>
-      <p class="muted">Join your county and your city to see storm reports from people near you, and start a private group to check on your family.</p>
+      <p class="muted">With a free account, you’re added to your county and city, where officials post updates. Then start or join a neighborhood or family group, where everyone can post storm reports.</p>
       <section class="card block comm-hero">
         <h3>Create a free account to join</h3>
         <p class="small" style="margin:0 0 12px">Your plans on this device come with you.</p>
@@ -679,36 +683,31 @@ async function renderCommunity() {
   page.innerHTML = `
     <div class="acct-row"><span class="small">Signed in as <strong>${esc(d.account.name)}</strong></span><button class="link-btn" type="button" id="logoutBtn">Log out</button></div>
     <h2>Community</h2>
-    <p class="muted">See storm reports from people near you, and check on your family after a storm.</p>
+    <p class="muted">You’re in your county and city automatically, where officials post updates. In neighborhood and family groups, everyone can post storm reports.</p>
     <section class="block"><div class="section-head"><h3>Your communities</h3></div>
-      ${d.mine.length ? `<ul class="comm-list">${d.mine.map(commRowHTML).join('')}</ul>` : '<div class="notice">You haven’t joined any yet. Join your county or city below.</div>'}</section>
-    ${d.suggested.length ? `<section class="block"><div class="section-head"><h3>Join near your places</h3></div>
-      <ul class="comm-list">${d.suggested.map((s) => `<li><button type="button" data-join="${esc(s.key)}"><span class="comm-ic k-${s.kind}"><svg viewBox="0 0 24 24" aria-hidden="true">${COMM_ICON[s.kind]}</svg></span>
-        <span class="comm-txt"><strong>${esc(s.name)}</strong><small>${COMM_KIND[s.kind]}</small></span><span class="pill-btn">Join</span></button></li>`).join('')}</ul></section>` : ''}
+      ${d.mine.length ? `<ul class="comm-list">${d.mine.map(commRowHTML).join('')}</ul>` : '<div class="notice">Make a plan for your home first, and you’ll be added to your county and city.</div>'}</section>
     <section class="card block fam-card">
-      <h3>Family group</h3>
-      <p class="small">A private group for your family or friends, as big as you want. See each other’s places and checklist progress, and tap “I’m safe” after a storm.</p>
-      <div class="btn-row"><button class="btn btn-primary" type="button" id="newFam">Start a group</button><button class="btn btn-ghost" type="button" id="joinFam">Join with a code</button></div>
+      <h3>Start a group</h3>
+      <p class="small"><strong>Neighborhood group:</strong> for your street or block. Everyone in it can post storm reports, like a flooded corner or a blocked drain.</p>
+      <p class="small"><strong>Family group:</strong> private, as big as you want. See each other’s places and checklist progress, and tap “I’m safe” after a storm.</p>
+      <div class="btn-row"><button class="btn btn-primary" type="button" data-new="neighborhood">Neighborhood</button><button class="btn btn-primary" type="button" data-new="family">Family</button></div>
+      <button class="btn btn-ghost btn-wide" type="button" id="joinFam">Join with a code</button>
     </section>
     <button class="btn btn-ghost btn-wide" type="button" id="reportBtn">${icon('camera')} Report a storm problem</button>`;
   $('#logoutBtn').addEventListener('click', openLogout);
   $$('[data-comm]', page).forEach((b) => b.addEventListener('click', () => { commOpen = b.dataset.comm; renderCommunity(); }));
-  $$('[data-join]', page).forEach((b) => b.addEventListener('click', async () => {
-    b.disabled = true;
-    try { const c = await api('/api/communities/join', { method: 'POST', body: { key: b.dataset.join } }); toast(`You joined ${c.name}.`); commOpen = c.id; renderCommunity(); }
-    catch (e) { b.disabled = false; toast(e.message); }
-  }));
-  $('#newFam').addEventListener('click', () => {
-    openSheet(`<h2 id="sheetTitle">Start a family group</h2><p class="muted small">Add as many people as you want. You’ll get a code to share with them.</p>
-      <label class="field-label" for="famName">Group name</label><input id="famName" type="text" maxlength="40" placeholder="${esc(d.account.name)}’s family">
+  $$('[data-new]', page).forEach((b) => b.addEventListener('click', () => {
+    const kind = b.dataset.new, fam = kind === 'family';
+    openSheet(`<h2 id="sheetTitle">Start a ${fam ? 'family' : 'neighborhood'} group</h2><p class="muted small">${fam ? 'Add as many people as you want.' : 'Invite the neighbors on your street or block.'} You’ll get a code to share with them.</p>
+      <label class="field-label" for="famName">Group name</label><input id="famName" type="text" maxlength="40" placeholder="${fam ? `${esc(d.account.name)}’s family` : 'e.g. Murchison Drive neighbors'}">
       <button class="btn btn-primary btn-wide" type="button" id="famGo">Create group</button>`);
     $('#famGo').addEventListener('click', async () => {
-      try { const c = await api('/api/communities', { method: 'POST', body: { name: $('#famName').value.trim() } }); closeSheet(); commOpen = c.id; renderCommunity(); }
+      try { const c = await api('/api/communities', { method: 'POST', body: { kind, name: $('#famName').value.trim() } }); closeSheet(); commOpen = c.id; renderCommunity(); }
       catch (e) { toast(e.message); }
     });
-  });
+  }));
   $('#joinFam').addEventListener('click', () => {
-    openSheet(`<h2 id="sheetTitle">Join a family group</h2><p class="muted small">Ask the person who made the group for its 6-letter code.</p>
+    openSheet(`<h2 id="sheetTitle">Join a group</h2><p class="muted small">Ask the person who made the neighborhood or family group for its 6-letter code.</p>
       <label class="field-label" for="famCode">Invite code</label><input id="famCode" type="text" maxlength="8" autocapitalize="characters" placeholder="e.g. K7Q2MX">
       <button class="btn btn-primary btn-wide" type="button" id="codeGo">Join</button>`);
     $('#codeGo').addEventListener('click', async () => {
@@ -723,7 +722,7 @@ async function renderCommunityDetail(id) {
   page.innerHTML = '<div class="card skeleton block"><span></span><span></span></div>';
   let c;
   try { c = await api(`/api/communities/${id}`); } catch (e) { commOpen = null; renderCommunity(); return; }
-  const fam = c.kind === 'family';
+  const fam = c.kind === 'family', group = GROUP_KINDS.includes(c.kind), official = !group;
   const dist = (r) => plan ? milesBetween(plan.lat, plan.lon, r.lat, r.lon) : null;
   page.innerHTML = `
     <button class="back-link" type="button" id="commBack">← All communities</button>
@@ -738,31 +737,32 @@ async function renderCommunityDetail(id) {
         ${p.places.length ? `<div class="place-chips">${p.places.map((pl) => `<span class="place-chip"><i class="dot lv-${pl.level}"></i>${esc(pl.label)}${pl.city ? `, ${esc(pl.city)}` : ''} · ${pl.done}/${pl.total} done</span>`).join('')}</div>` : '<small>No plan yet</small>'}
       </div></li>`).join('')}</ul>
       <button class="btn btn-primary btn-wide" type="button" id="safeBtn">I’m safe</button>
-      ${fam ? `<div class="invite"><span>Invite code</span><b>${esc(c.invite_code)}</b><button class="pill-btn" type="button" id="copyCode">Copy</button></div>
-      <p class="fineprint">Send this code to family. They create an account and tap “Join with a code.”</p>` : ''}
     </section>` : ''}
+    ${group ? `<section class="card block"><div class="invite"><span>Invite code</span><b>${esc(c.invite_code)}</b><button class="pill-btn" type="button" id="copyCode">Copy</button></div>
+      <p class="fineprint">Send this code to ${fam ? 'family' : 'neighbors'}. They create a free account and tap “Join with a code.”</p></section>` : ''}
     <section class="block">
-      <div class="section-head"><h3>Storm reports</h3><button class="link-btn" type="button" id="reportHere">+ Report</button></div>
+      <div class="section-head"><h3>${official ? 'Official updates' : 'Storm reports from this group'}</h3>${c.can_post ? '<button class="link-btn" type="button" id="reportHere">+ Post</button>' : ''}</div>
+      ${official ? `<p class="small muted" style="margin:-4px 0 10px">${c.can_post ? 'You’re a verified official here, so you can post updates everyone in the area will see.' : `Only verified officials, like the county’s emergency office or the city, can post here. To share what you see, post in a neighborhood or family group.`}</p>` : ''}
       ${c.reports.length ? `<ul class="rep-list">${c.reports.map((r) => `<li><button type="button" data-rep="${r.id}"><span class="sev-dot s${r.severity}"></span>
         <span class="comm-txt"><strong>${esc(r.title)}</strong><small>${esc(r.kind_label)} · ${esc(fmtDay(r.created_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}${dist(r) != null ? ` · ${dist(r).toFixed(1)} mi from ${esc(plan.label)}` : ''}${r.confirmations ? ` · ${r.confirmations} confirmed` : ''}</small></span>
         <svg class="chev-r" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>`).join('')}</ul>`
-      : `<div class="notice">No storm reports ${fam ? 'near your family’s places' : 'here'} right now. If you see flooding, a clogged drain or a fallen tree, report it so ${fam ? 'your family knows' : 'your neighbors know'}.</div>`}
+      : `<div class="notice">${official ? 'No official updates right now.' : `No storm reports yet. If you see flooding, a clogged drain or a fallen tree, post it so ${fam ? 'your family knows' : 'your neighbors know'}.`}</div>`}
     </section>
-    <button class="link-btn danger" type="button" id="leaveBtn">Leave this ${fam ? 'group' : 'community'}</button>`;
+    ${group ? '<button class="link-btn danger" type="button" id="leaveBtn">Leave this group</button>' : ''}`;
   drawCommunityMap(c);
   $('#commBack').addEventListener('click', () => { commOpen = null; renderCommunity(); });
-  $('#reportHere').addEventListener('click', () => openReportForm(() => renderCommunity()));
+  if ($('#reportHere')) $('#reportHere').addEventListener('click', () => openReportForm(() => renderCommunity(), null, c.id));
   $$('[data-rep]', page).forEach((b) => b.addEventListener('click', () => openReport(c.reports.find((r) => r.id === b.dataset.rep))));
-  $('#leaveBtn').addEventListener('click', async () => {
+  if ($('#leaveBtn')) $('#leaveBtn').addEventListener('click', async () => {
     try { await api(`/api/communities/${id}/leave`, { method: 'POST' }); commOpen = null; toast(`You left ${c.name}.`); renderCommunity(); } catch (e) { toast(e.message); }
   });
   if (fam) {
     $('#safeBtn').addEventListener('click', async () => {
       try { await api(`/api/communities/${id}/safe`, { method: 'POST', body: { safe: true } }); toast('Your family can see you’re safe.'); renderCommunity(); } catch (e) { toast(e.message); }
     });
-    const cp = $('#copyCode');
-    if (cp) cp.addEventListener('click', () => { try { navigator.clipboard.writeText(c.invite_code); toast('Code copied.'); } catch (e) { toast(c.invite_code); } });
   }
+  const cp = $('#copyCode');
+  if (cp) cp.addEventListener('click', () => { try { navigator.clipboard.writeText(c.invite_code); toast('Code copied.'); } catch (e) { toast(c.invite_code); } });
 }
 let commMap = null;
 function drawCommunityMap(c) {
@@ -785,6 +785,7 @@ function drawCommunityMap(c) {
 async function openReport(r) {
   openSheet(`<h2 id="sheetTitle">${esc(r.title)}</h2>
     <div id="repPhoto"></div>
+    ${r.community_name ? `<p class="small"><strong>${r.official ? `Official update from ${esc(r.community_name)}` : `Posted in ${esc(r.community_name)}`}</strong></p>` : ''}
     <p class="muted small">${esc(KINDS[r.kind] || 'Storm problem')} · ${esc(fmtDay(r.created_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}${r.ai_checked ? ' · checked by AI' : ''}</p>
     ${r.note ? `<p>${esc(r.note)}</p>` : ''}
     <p><strong>${r.confirmations}</strong> ${r.confirmations === 1 ? 'person has' : 'people have'} confirmed this.</p>
@@ -818,11 +819,28 @@ function compress(file, max = 1280, q = 0.72) {
     img.src = url;
   });
 }
-function openReportForm(after, center) {
+async function openReportForm(after, center, communityId) {
   if (!plan) return;
+  let groups = [];
+  try { groups = ((await api('/api/communities')).mine || []).filter((c) => c.can_post); } catch (e) { groups = []; }
+  if (!state.account) {
+    openSheet(`<h2 id="sheetTitle">Create a free account to post</h2><p class="muted">Storm reports go to a neighborhood or family group, so the people near you see them.</p>
+      <button class="btn btn-primary btn-wide" type="button" id="rSignup">Create account</button><button class="btn btn-ghost btn-wide" type="button" id="rLogin">Log in</button>`);
+    $('#rSignup').addEventListener('click', () => openAccountSheet('signup'));
+    $('#rLogin').addEventListener('click', () => openAccountSheet('login'));
+    return;
+  }
+  if (!groups.length) {
+    openSheet(`<h2 id="sheetTitle">Join a group to post</h2><p class="muted">County and city communities are for official updates. To post a storm report, start or join a neighborhood or family group in the Community tab.</p>
+      <button class="btn btn-primary btn-wide" type="button" id="goComm">Go to Community</button>`);
+    $('#goComm').addEventListener('click', () => { closeSheet(); commOpen = null; switchView('community'); });
+    return;
+  }
   const draft = { kind: 'flooding', severity: 2, photo: null, ai: false, where: center ? 'map' : 'here' };
   openSheet(`<h2 id="sheetTitle">Report a storm problem</h2>
-    <p class="muted small">People in your communities will see it. Don’t take photos in dangerous spots.</p>
+    <p class="muted small">Everyone in the group you pick will see it. Don’t take photos in dangerous spots.</p>
+    <label class="field-label" for="repGroup">Post to</label>
+    <select id="repGroup">${groups.map((g) => `<option value="${g.id}" ${g.id === communityId ? 'selected' : ''}>${esc(g.name)} (${esc(COMM_KIND[g.kind])})</option>`).join('')}</select>
     <label class="field-label">Where is it?</label>
     <div class="sev-row ${center ? 'three' : ''}" id="whereRow">${center ? '<button type="button" data-where="map" aria-pressed="true">Center of the map</button>' : ''}<button type="button" data-where="here" aria-pressed="${!center}">Where I am now</button><button type="button" data-where="place" aria-pressed="false">At ${esc(plan.label || 'my place')}</button></div>
     <label class="photo-drop" id="drop"><input type="file" id="repFile" accept="image/*" capture="environment">${icon('camera')}<strong>Add a photo</strong><span class="small">AI will label it for you</span></label>
@@ -868,7 +886,7 @@ function openReportForm(after, center) {
       if (h) spot = h; else toast(`Couldn’t get your location, so it’s posted at ${plan.label || 'your place'}.`);
     }
     try {
-      await api('/api/reports', { method: 'POST', body: { ...spot, kind: $('#repKind').value, title: $('#repTitle').value.trim(), severity: draft.severity, photo: draft.photo, ai_checked: draft.ai, county: plan.place.county } });
+      await api('/api/reports', { method: 'POST', body: { ...spot, community_id: $('#repGroup').value, kind: $('#repKind').value, title: $('#repTitle').value.trim(), severity: draft.severity, photo: draft.photo, ai_checked: draft.ai } });
       closeSheet(); toast('Posted. Thanks for looking out for your community.');
       if (after) after(); else if (currentView === 'community') renderCommunity();
     } catch (err) { btn.disabled = false; toast(err.message); }

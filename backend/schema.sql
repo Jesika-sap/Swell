@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS reports (
     ai_checked    INTEGER NOT NULL DEFAULT 0,
     confirmations INTEGER NOT NULL DEFAULT 0,
     status        TEXT NOT NULL DEFAULT 'open',  -- open, cleared
-    created_at    TEXT NOT NULL
+    created_at    TEXT NOT NULL,
+    community_id  TEXT               -- the group it was posted to
 );
 CREATE INDEX IF NOT EXISTS reports_geo ON reports (lat, lon);
 
@@ -116,25 +117,26 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at  TEXT NOT NULL
 );
 
--- Communities: a county (San Mateo County), a city (Millbrae), or a private
--- family group of up to 5 people that you join with an invite code.
+-- Communities: a county (San Mateo County) or a city (Millbrae), where only
+-- verified officials post updates, and private family or neighborhood groups,
+-- joined with an invite code, where every member can post reports.
 CREATE TABLE IF NOT EXISTS communities (
     id            TEXT PRIMARY KEY,
-    kind          TEXT NOT NULL,      -- county, city, family
+    kind          TEXT NOT NULL,      -- county, city, family, neighborhood
     name          TEXT NOT NULL,
-    place_key     TEXT UNIQUE,        -- e.g. "county:CA:San Mateo", NULL for family groups
+    place_key     TEXT UNIQUE,        -- e.g. "county:CA:San Mateo", NULL for groups
     county        TEXT,
     lat           REAL,
     lon           REAL,
     owner_id      TEXT,
-    invite_code   TEXT UNIQUE,        -- family groups only
+    invite_code   TEXT UNIQUE,        -- family and neighborhood groups
     created_at    TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS community_members (
     community_id  TEXT NOT NULL,
     account_id    TEXT NOT NULL,
-    role          TEXT NOT NULL DEFAULT 'member',  -- owner, member
+    role          TEXT NOT NULL DEFAULT 'member',  -- owner, member, official
     safe_at       TEXT,                            -- last "I'm safe" check-in (family groups)
     joined_at     TEXT NOT NULL,
     PRIMARY KEY (community_id, account_id)
