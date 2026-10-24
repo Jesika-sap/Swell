@@ -14,7 +14,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -34,10 +33,28 @@
         <label class="field-label" for="langSelect">Language for your plan</label>
         <select id="langSelect"></select>
         <button class="btn btn-primary btn-wide" type="button" id="obStart">Get started</button>
-        <p class="fineprint center">No account needed. Your plan is linked to this device only.</p>
+        <p class="fineprint center">Works for any home or farm, anywhere El Niño reaches.</p>
       </div>
     </div>
 
+
+    <div class="ob-step" data-step="9" hidden>
+      <div class="ob-top"><button class="back-link" type="button" data-ob-back="1">← Back</button><span class="ob-count">Your account</span></div>
+      <h2 id="acctTitle">Create your account</h2>
+      <p class="muted" id="acctLead">Your plans follow you to any phone or computer, and you can join your county, your city and a private family group.</p>
+      <form id="acctForm" autocomplete="on">
+        <div id="nameWrap"><label class="field-label" for="acctName">First name</label>
+        <input id="acctName" type="text" maxlength="40" autocomplete="given-name"></div>
+        <label class="field-label" for="acctEmail">Email</label>
+        <input id="acctEmail" type="email" maxlength="120" autocomplete="email" required>
+        <label class="field-label" for="acctPw">Password</label>
+        <input id="acctPw" type="password" minlength="8" autocomplete="new-password" required>
+        <p class="fineprint" id="pwHint" style="margin-top:6px">At least 8 characters. We store only a scrambled version of it.</p>
+        <button class="btn btn-primary btn-wide" type="submit" id="acctSubmit">Create account</button>
+      </form>
+      <button class="link-btn" type="button" id="acctSwitch" style="margin-top:14px">Already have an account? Log in</button>
+      <button class="link-btn muted" type="button" id="acctSkip" style="margin-top:6px">Try it without an account</button>
+    </div>
     <div class="ob-step" data-step="2" hidden>
       <div class="ob-top"><button class="back-link" type="button" data-ob-back="1">← Back</button><span class="ob-count">Getting started</span></div>
       <h2>Who is this plan for?</h2>
@@ -107,11 +124,7 @@
   <main id="main" hidden>
     <section id="view-plan" class="view active" aria-label="My plan"><div class="page" id="planPage"></div></section>
     <section id="view-list" class="view" aria-label="Checklist"><div class="page" id="listPage"></div></section>
-    <section id="view-map" class="view view-map" aria-label="Map">
-      <div id="map"></div>
-      <div class="map-card" id="mapCard"></div>
-      <button class="fab" type="button" id="reportFab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Report a problem</button>
-    </section>
+    <section id="view-community" class="view" aria-label="Communities"><div class="page" id="communityPage"></div></section>
     <section id="view-help" class="view" aria-label="Help nearby"><div class="page" id="helpPage"></div></section>
     <section id="view-news" class="view" aria-label="News"><div class="page" id="newsPage"></div></section>
     <section id="view-org" class="view" aria-label="Organization dashboard"><div class="page" id="orgPage"></div></section>
@@ -120,7 +133,7 @@
   <nav class="tabbar" id="tabbar" aria-label="Main" hidden>
     <button class="tab active" data-view="plan" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z"/></svg><span>My plan</span></button>
     <button class="tab" data-view="list" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg><span>Checklist</span></button>
-    <button class="tab" data-view="map" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
+    <button class="tab" data-view="community" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0M14 20a4.5 4.5 0 0 1 7-3.7"/></svg><span>Community</span></button>
     <button class="tab" data-view="help" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/></svg><span>Help</span></button>
     <button class="tab" data-view="news" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a2 2 0 0 1 2 2v13a1 1 0 0 0 2 0V8"/><path d="M5 4v14a2 2 0 0 0 2 2h13"/><path d="M8 8h6M8 12h6M8 16h3"/></svg><span>News</span></button>
   </nav>
@@ -138,7 +151,6 @@
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script src="config.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="app.js"></script>
 </body>
 </html>

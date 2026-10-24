@@ -325,3 +325,51 @@ class OrgTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AccountCommunityTests(unittest.TestCase):
+    def test_signup_login_and_family_group(self):
+        c = server.app.test_client()
+        a = {"X-Device-Id": "acct-device-aaaa1"}
+        plan = c.post("/api/plan", json={"address": "1 Main St, Foster City, CA"}, headers=a).get_json()
+        res = c.post("/api/account/signup", json={"name": "Jesika", "email": "J@Example.com", "password": "short"}, headers=a)
+        self.assertEqual(res.status_code, 400)  # password too short
+        res = c.post("/api/account/signup", json={"name": "Jesika", "email": "J@Example.com", "password": "longenough1"}, headers=a)
+        self.assertEqual(res.status_code, 201, res.get_json())
+        row = db.one("SELECT pw_hash FROM accounts WHERE email = ?", ("j@example.com",))
+        self.assertNotIn("longenough1", row["pw_hash"])  # only a hash is stored
+
+        # Logging in on a new phone brings the plan along.
+        b = {"X-Device-Id": "new-phone-bbbb2"}
+        self.assertEqual(c.post("/api/account/login", json={"email": "j@example.com", "password": "nope"}, headers=b).status_code, 400)
+        d = c.post("/api/account/login", json={"email": "j@example.com", "password": "longenough1"}, headers=b).get_json()
+        self.assertEqual(d["device_id"], "acct-device-aaaa1")
+        b = {"X-Device-Id": d["device_id"]}
+        self.assertEqual([p["id"] for p in c.get("/api/plans", headers=b).get_json()], [plan["id"]])
+
+        # County and city communities come from your own plans.
+        lst = c.get("/api/communities", headers=b).get_json()
+        keys = {s["kind"]: s["key"] for s in lst["suggested"]}
+        self.assertIn("county", keys)
+        self.assertEqual(c.post("/api/communities/join", json={"key": "county:NY:Kings"}, headers=b).status_code, 400)
+        county = c.post("/api/communities/join", json={"key": keys["county"]}, headers=b).get_json()
+        c.post("/api/reports", json={"lat": plan["lat"] + 0.01, "lon": plan["lon"], "kind": "drain", "title": "Clogged drain",
+                                     "severity": 2, "county": plan["place"]["county"]}, headers=OTHER)
+        detail = c.get(f"/api/communities/{county['id']}", headers=b).get_json()
+        self.assertEqual(detail["reports"][0]["title"], "Clogged drain")
+        self.assertEqual(c.get(f"/api/communities/{county['id']}", headers=OTHER).status_code, 400)  # no account
+
+        # Family group: invite code, 5-person limit, "I'm safe".
+        fam = c.post("/api/communities", json={"name": "Sapkota family"}, headers=b).get_json()
+        code = c.get(f"/api/communities/{fam['id']}", headers=b).get_json()["invite_code"]
+        for i in range(4):
+            h = {"X-Device-Id": f"cousin-device-{i}xx"}
+            c.post("/api/account/signup", json={"name": f"Cousin {i}", "email": f"c{i}@example.com", "password": "password123"}, headers=h)
+            self.assertEqual(c.post("/api/communities/join", json={"code": code.lower()}, headers=h).status_code, 201)
+        h = {"X-Device-Id": "one-too-many-zz"}
+        c.post("/api/account/signup", json={"name": "Extra", "email": "x@example.com", "password": "password123"}, headers=h)
+        self.assertEqual(c.post("/api/communities/join", json={"code": code}, headers=h).status_code, 400)  # full
+        safe = c.post(f"/api/communities/{fam['id']}/safe", json={"safe": True}, headers=b).get_json()
+        me = [p for p in safe["people"] if p["you"]][0]
+        self.assertTrue(me["safe_at"])
+        self.assertEqual(me["places"][0]["total"], plan["progress"]["total"])

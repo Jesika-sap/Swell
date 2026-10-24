@@ -92,14 +92,14 @@ function showApp() {
 }
 
 $('#obFacts').innerHTML = [
-  ['83%+', 'chance of a strong to very strong El Niño this winter', 'NOAA, Oct 2026'],
-  ['1–2 ft', 'higher ocean levels than tide tables predict in San Mateo County', 'San Mateo County, Oct 2026'],
-  ['2', 'emergencies already declared: California (Sept 21) and San Mateo County (Oct 20)', 'State of California · San Mateo County']
+  ['83%+', 'chance of a strong to very strong El Niño this winter', 'NOAA Climate Prediction Center, Oct 2026'],
+  ['2–7 yrs', 'how often El Niño comes back, bringing floods to some places and drought to others', 'NOAA'],
+  ['$5.7T', 'lost by the world economy after the last very strong El Niño, in 1997–98', 'Callahan & Mankin, Science, 2023']
 ].map(([b, t, s]) => `<div class="fact"><b>${b}</b><span>${t}<small>${s}</small></span></div>`).join('');
 $('#langSelect').innerHTML = LANGS.map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
 $('#langSelect').value = state.language;
 $('#langSelect').addEventListener('change', (e) => { state.language = e.target.value; save(); });
-$('#obStart').addEventListener('click', () => obShow(2));
+$('#obStart').addEventListener('click', () => obShow(state.account ? 2 : 9));
 $$('[data-role]').forEach((b) => b.addEventListener('click', () => { role = b.dataset.role; obShow(3); }));
 $('#farmPick').innerHTML = FARM_GROWS.map(([k, t]) => `<button class="pick" type="button" data-grow="${k}" aria-pressed="false"><strong>${esc(t)}</strong></button>`).join('');
 $('#farmMore').innerHTML = FARM_MORE.map(([k, t]) => `<button class="pick" type="button" data-farm="${k}" aria-pressed="false"><strong>${esc(t)}</strong></button>`).join('');
@@ -177,12 +177,12 @@ function setPlan(p) {
   state.current = p.id;
   state.cached = p;
   save();
-  $('#placeName').textContent = p.label || p.place.city || 'Home';
+  $('#placeName').textContent = [p.label, p.place.city].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' · ') || 'Home';
   renderAll();
 }
 function renderAll() {
   renderPlan(); renderList(); renderHelp();
-  if (currentView === 'map') renderMap();
+  if (currentView === 'community') renderCommunity();
   if (currentView === 'news') renderNews();
 }
 const LEVEL_TEXT = { high: 'High risk', elevated: 'Elevated risk', lower: 'Lower risk' };
@@ -528,48 +528,226 @@ function resHTML(r) {
 }
 
 /* ---------------- map + community reports ---------------- */
-let map = null, layer = null, reports = [];
-const KINDS = { flooding: 'Flooded street', drain: 'Clogged storm drain', landslide: 'Landslide or mudslide', tree: 'Fallen tree', power: 'Downed power line', road: 'Road damage', other: 'Other storm problem' };
-function pinIcon(cls, svg) {
-  return L.divIcon({ className: '', html: `<div class="pin ${cls}"><svg viewBox="0 0 24 24">${svg}</svg></div>`, iconSize: [30, 30], iconAnchor: [15, 30] });
+/* ---------------- accounts ---------------- */
+function newDeviceId() {
+  return crypto.randomUUID ? crypto.randomUUID() : 'd-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
 }
-async function renderMap() {
-  if (!plan || typeof L === 'undefined') return;
-  if (!map) {
-    map = L.map('map', { zoomControl: false }).setView([plan.lat, plan.lon], 14);
-    L.control.zoom({ position: 'bottomleft' }).addTo(map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
-    layer = L.layerGroup().addTo(map);
-  } else {
-    map.invalidateSize();
+async function submitAccount(mode, name, email, password) {
+  if (mode === 'signup') {
+    const d = await api('/api/account/signup', { method: 'POST', body: { name, email, password } });
+    state.account = d.account; save();
+    return { account: d.account, plans: [] };
   }
-  layer.clearLayers();
-  L.marker([plan.lat, plan.lon], { icon: pinIcon('pin-home', ICON.home) }).addTo(layer).bindPopup(`<b>${esc(plan.label)}</b>`);
-  (plan.help.sandbags || []).forEach((s) => L.marker([s.lat, s.lon], { icon: pinIcon('pin-bag', ICON.bag) }).addTo(layer)
-    .bindPopup(`<b>Sandbags: ${esc(s.name)}</b><br>${esc(s.address)}<br><a href="${mapsLink(s.address)}" target="_blank" rel="noopener">Directions</a>`));
-  $('#mapCard').innerHTML = `<span><i style="background:var(--ocean)"></i>Your place</span><span><i style="background:#b86a00"></i>Sandbags</span><span><i style="background:#c0392b"></i>Neighbor reports</span>`;
+  const d = await api('/api/account/login', { method: 'POST', body: { email, password } });
+  state.deviceId = d.device_id; state.account = d.account; save();
+  const plans = await api('/api/plans');
+  return { account: d.account, plans };
+}
+function accountFormHTML(mode, prefix) {
+  const signup = mode === 'signup';
+  return `${signup ? `<label class="field-label" for="${prefix}Name">First name</label><input id="${prefix}Name" type="text" maxlength="40" autocomplete="given-name">` : ''}
+    <label class="field-label" for="${prefix}Email">Email</label><input id="${prefix}Email" type="email" maxlength="120" autocomplete="email">
+    <label class="field-label" for="${prefix}Pw">Password</label><input id="${prefix}Pw" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}">
+    ${signup ? '<p class="fineprint" style="margin-top:6px">At least 8 characters. We store only a scrambled version of it.</p>' : ''}`;
+}
+
+// Onboarding account step
+let acctMode = 'signup';
+function setAcctMode(m) {
+  acctMode = m;
+  const signup = m === 'signup';
+  $('#acctTitle').textContent = signup ? 'Create your account' : 'Welcome back';
+  $('#acctLead').textContent = signup ? 'Your plans follow you to any phone or computer, and you can join your county, your city and a private family group.' : 'Log in to see your plans and communities.';
+  $('#nameWrap').hidden = !signup;
+  $('#pwHint').hidden = !signup;
+  $('#acctPw').setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+  $('#acctSubmit').textContent = signup ? 'Create account' : 'Log in';
+  $('#acctSwitch').textContent = signup ? 'Already have an account? Log in' : 'New here? Create an account';
+}
+$('#acctSwitch').addEventListener('click', () => setAcctMode(acctMode === 'signup' ? 'login' : 'signup'));
+$('#acctSkip').addEventListener('click', () => obShow(2));
+$('#acctForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('#acctSubmit'); btn.disabled = true;
   try {
-    reports = await api(`/api/reports?lat=${plan.lat}&lon=${plan.lon}&miles=10`);
-  } catch (e) { reports = []; }
-  reports.forEach((r) => L.marker([r.lat, r.lon], { icon: pinIcon('pin-r' + r.severity, ICON.drop) }).addTo(layer).on('click', () => openReport(r)));
-  setTimeout(() => map.invalidateSize(), 50);
+    const r = await submitAccount(acctMode, $('#acctName').value.trim(), $('#acctEmail').value.trim(), $('#acctPw').value);
+    toast(acctMode === 'signup' ? `Welcome, ${r.account.name}!` : `Welcome back, ${r.account.name}!`);
+    if (r.plans.length) { showApp(); setPlan(await api(`/api/plan/${r.plans[0].id}`)); switchView('plan'); }
+    else obShow(2);
+  } catch (err) { toast(err.message); }
+  btn.disabled = false;
+});
+
+function openAccountSheet(mode = 'signup') {
+  openSheet(`<h2 id="sheetTitle">${mode === 'signup' ? 'Create your account' : 'Log in'}</h2>
+    <p class="muted small">${mode === 'signup' ? 'Your plans on this device move into your account. Then you can join communities and family groups.' : 'Plans you made on this device move into your account.'}</p>
+    ${accountFormHTML(mode, 'sh')}
+    <button class="btn btn-primary btn-wide" type="button" id="shGo">${mode === 'signup' ? 'Create account' : 'Log in'}</button>
+    <button class="link-btn" type="button" id="shSwitch" style="margin-top:12px">${mode === 'signup' ? 'Already have an account? Log in' : 'New here? Create an account'}</button>`);
+  $('#shSwitch').addEventListener('click', () => openAccountSheet(mode === 'signup' ? 'login' : 'signup'));
+  $('#shGo').addEventListener('click', async () => {
+    const b = $('#shGo'); b.disabled = true;
+    try {
+      const r = await submitAccount(mode, mode === 'signup' ? $('#shName').value.trim() : '', $('#shEmail').value.trim(), $('#shPw').value);
+      closeSheet();
+      toast(mode === 'signup' ? `Welcome, ${r.account.name}!` : `Welcome back, ${r.account.name}!`);
+      if (mode === 'login' && r.plans.length && !r.plans.some((p) => p.id === state.current)) setPlan(await api(`/api/plan/${r.plans[0].id}`));
+      renderCommunity();
+    } catch (err) { b.disabled = false; toast(err.message); }
+  });
+}
+function openLogout() {
+  openSheet(`<h2 id="sheetTitle">Log out?</h2>
+    <p class="muted">Your plans and communities stay in your account. Log in again on any device to get them back.</p>
+    <button class="btn btn-primary btn-wide" type="button" id="logoutGo">Log out</button>`);
+  $('#logoutGo').addEventListener('click', () => {
+    Object.assign(state, { account: null, deviceId: newDeviceId(), current: null, cached: null, org: null });
+    save(); location.reload();
+  });
+}
+
+/* ---------------- communities ---------------- */
+const KINDS = { flooding: 'Flooded street', drain: 'Clogged storm drain', landslide: 'Landslide or mudslide', tree: 'Fallen tree', power: 'Downed power line', road: 'Road damage', other: 'Other storm problem' };
+const COMM_KIND = { county: 'County', city: 'City', family: 'Private family group' };
+const COMM_ICON = {
+  county: '<path d="M3 20l5-14 5 8 3-4 5 10z"/>',
+  city: '<path d="M4 21V9l5-3v15M9 21V4l6 3v14M15 21v-9l5 2v7"/>',
+  family: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0M14 20a4.5 4.5 0 0 1 7-3.7"/>'
+};
+let commOpen = null;
+function milesBetween(a, b, c, d) {
+  const r = 3958.8, p1 = a * Math.PI / 180, p2 = c * Math.PI / 180, dp = p2 - p1, dl = (d - b) * Math.PI / 180;
+  const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(h));
+}
+function commRowHTML(c) {
+  return `<li><button type="button" data-comm="${c.id}"><span class="comm-ic k-${c.kind}"><svg viewBox="0 0 24 24" aria-hidden="true">${COMM_ICON[c.kind]}</svg></span>
+    <span class="comm-txt"><strong>${esc(c.name)}</strong><small>${COMM_KIND[c.kind]} · ${c.members} ${c.members === 1 ? 'member' : 'members'}</small></span>
+    <svg class="chev-r" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>`;
+}
+async function renderCommunity() {
+  const page = $('#communityPage');
+  if (commOpen) { renderCommunityDetail(commOpen); return; }
+  page.innerHTML = '<h2>Community</h2><div class="card skeleton block"><span></span><span></span></div>';
+  let d;
+  try { d = await api('/api/communities'); } catch (e) { page.innerHTML = `<h2>Community</h2><div class="notice">${esc(e.message)}</div>`; return; }
+  state.account = d.account; save();
+  if (!d.account) {
+    page.innerHTML = `<h2>Community</h2>
+      <p class="muted">Join your county and your city to see storm reports from people near you, and start a private group to check on your family.</p>
+      <section class="card block comm-hero">
+        <h3>Create a free account to join</h3>
+        <p class="small" style="margin:0 0 12px">Your plans on this device come with you.</p>
+        <button class="btn btn-primary btn-wide" type="button" id="cSignup">Create account</button>
+        <button class="btn btn-ghost btn-wide" type="button" id="cLogin">Log in</button>
+      </section>`;
+    $('#cSignup').addEventListener('click', () => openAccountSheet('signup'));
+    $('#cLogin').addEventListener('click', () => openAccountSheet('login'));
+    return;
+  }
+  page.innerHTML = `
+    <div class="acct-row"><span class="small">Signed in as <strong>${esc(d.account.name)}</strong></span><button class="link-btn" type="button" id="logoutBtn">Log out</button></div>
+    <h2>Community</h2>
+    <p class="muted">See storm reports from people near you, and check on your family after a storm.</p>
+    <section class="block"><div class="section-head"><h3>Your communities</h3></div>
+      ${d.mine.length ? `<ul class="comm-list">${d.mine.map(commRowHTML).join('')}</ul>` : '<div class="notice">You haven’t joined any yet. Join your county or city below.</div>'}</section>
+    ${d.suggested.length ? `<section class="block"><div class="section-head"><h3>Join near your places</h3></div>
+      <ul class="comm-list">${d.suggested.map((s) => `<li><button type="button" data-join="${esc(s.key)}"><span class="comm-ic k-${s.kind}"><svg viewBox="0 0 24 24" aria-hidden="true">${COMM_ICON[s.kind]}</svg></span>
+        <span class="comm-txt"><strong>${esc(s.name)}</strong><small>${COMM_KIND[s.kind]}</small></span><span class="pill-btn">Join</span></button></li>`).join('')}</ul></section>` : ''}
+    <section class="card block fam-card">
+      <h3>Family group</h3>
+      <p class="small">A private group for up to ${d.family_max} people. See each other’s places and checklist progress, and tap “I’m safe” after a storm.</p>
+      <div class="btn-row"><button class="btn btn-primary" type="button" id="newFam">Start a group</button><button class="btn btn-ghost" type="button" id="joinFam">Join with a code</button></div>
+    </section>
+    <button class="btn btn-ghost btn-wide" type="button" id="reportBtn">${icon('camera')} Report a storm problem</button>`;
+  $('#logoutBtn').addEventListener('click', openLogout);
+  $$('[data-comm]', page).forEach((b) => b.addEventListener('click', () => { commOpen = b.dataset.comm; renderCommunity(); }));
+  $$('[data-join]', page).forEach((b) => b.addEventListener('click', async () => {
+    b.disabled = true;
+    try { const c = await api('/api/communities/join', { method: 'POST', body: { key: b.dataset.join } }); toast(`You joined ${c.name}.`); commOpen = c.id; renderCommunity(); }
+    catch (e) { b.disabled = false; toast(e.message); }
+  }));
+  $('#newFam').addEventListener('click', () => {
+    openSheet(`<h2 id="sheetTitle">Start a family group</h2><p class="muted small">Up to ${d.family_max} people. You’ll get a code to share with them.</p>
+      <label class="field-label" for="famName">Group name</label><input id="famName" type="text" maxlength="40" placeholder="${esc(d.account.name)}’s family">
+      <button class="btn btn-primary btn-wide" type="button" id="famGo">Create group</button>`);
+    $('#famGo').addEventListener('click', async () => {
+      try { const c = await api('/api/communities', { method: 'POST', body: { name: $('#famName').value.trim() } }); closeSheet(); commOpen = c.id; renderCommunity(); }
+      catch (e) { toast(e.message); }
+    });
+  });
+  $('#joinFam').addEventListener('click', () => {
+    openSheet(`<h2 id="sheetTitle">Join a family group</h2><p class="muted small">Ask the person who made the group for its 6-letter code.</p>
+      <label class="field-label" for="famCode">Invite code</label><input id="famCode" type="text" maxlength="8" autocapitalize="characters" placeholder="e.g. K7Q2MX">
+      <button class="btn btn-primary btn-wide" type="button" id="codeGo">Join</button>`);
+    $('#codeGo').addEventListener('click', async () => {
+      try { const c = await api('/api/communities/join', { method: 'POST', body: { code: $('#famCode').value } }); closeSheet(); toast(`You joined ${c.name}.`); commOpen = c.id; renderCommunity(); }
+      catch (e) { toast(e.message); }
+    });
+  });
+  $('#reportBtn').addEventListener('click', () => openReportForm());
+}
+async function renderCommunityDetail(id) {
+  const page = $('#communityPage');
+  page.innerHTML = '<div class="card skeleton block"><span></span><span></span></div>';
+  let c;
+  try { c = await api(`/api/communities/${id}`); } catch (e) { commOpen = null; renderCommunity(); return; }
+  const fam = c.kind === 'family';
+  const dist = (r) => plan ? milesBetween(plan.lat, plan.lon, r.lat, r.lon) : null;
+  page.innerHTML = `
+    <button class="back-link" type="button" id="commBack">← All communities</button>
+    <div class="comm-head"><span class="comm-ic big k-${c.kind}"><svg viewBox="0 0 24 24" aria-hidden="true">${COMM_ICON[c.kind]}</svg></span>
+      <div><h2 style="margin:0">${esc(c.name)}</h2><p class="muted small" style="margin:2px 0 0">${COMM_KIND[c.kind]} · ${c.members}${fam ? ` of ${c.max_members}` : ''} ${c.members === 1 ? 'member' : 'members'}</p></div></div>
+    ${fam ? `<section class="card block">
+      <div class="section-head"><h3>Members</h3></div>
+      <ul class="people">${c.people.map((p) => `<li><span class="avatar">${esc(p.name.slice(0, 1).toUpperCase())}</span><div>
+        <strong>${esc(p.name)}${p.you ? ' (you)' : ''}</strong>
+        <small class="${p.safe_at ? 'safe' : ''}">${p.safe_at ? `Safe · checked in ${esc(fmtDay(p.safe_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}` : 'No check-in yet'}</small>
+        ${p.places.length ? `<div class="place-chips">${p.places.map((pl) => `<span class="place-chip"><i class="dot lv-${pl.level}"></i>${esc(pl.label)}${pl.city ? `, ${esc(pl.city)}` : ''} · ${pl.done}/${pl.total} done</span>`).join('')}</div>` : '<small>No plan yet</small>'}
+      </div></li>`).join('')}</ul>
+      <button class="btn btn-primary btn-wide" type="button" id="safeBtn">I’m safe</button>
+      ${c.members < c.max_members ? `<div class="invite"><span>Invite code</span><b>${esc(c.invite_code)}</b><button class="pill-btn" type="button" id="copyCode">Copy</button></div>
+      <p class="fineprint">Send this code to family. They create an account and tap “Join with a code.”</p>` : '<p class="fineprint">This group is full.</p>'}
+    </section>` : ''}
+    <section class="block">
+      <div class="section-head"><h3>Storm reports</h3><button class="link-btn" type="button" id="reportHere">+ Report</button></div>
+      ${c.reports.length ? `<ul class="rep-list">${c.reports.map((r) => `<li><button type="button" data-rep="${r.id}"><span class="sev-dot s${r.severity}"></span>
+        <span class="comm-txt"><strong>${esc(r.title)}</strong><small>${esc(r.kind_label)} · ${esc(fmtDay(r.created_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}${dist(r) != null ? ` · ${dist(r).toFixed(1)} mi from ${esc(plan.label)}` : ''}${r.confirmations ? ` · ${r.confirmations} confirmed` : ''}</small></span>
+        <svg class="chev-r" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>`).join('')}</ul>`
+      : `<div class="notice">No storm reports ${fam ? 'near your family’s places' : 'here'} right now. If you see flooding, a clogged drain or a fallen tree, report it so ${fam ? 'your family knows' : 'your neighbors know'}.</div>`}
+    </section>
+    <button class="link-btn danger" type="button" id="leaveBtn">Leave this ${fam ? 'group' : 'community'}</button>`;
+  $('#commBack').addEventListener('click', () => { commOpen = null; renderCommunity(); });
+  $('#reportHere').addEventListener('click', () => openReportForm(() => renderCommunity()));
+  $$('[data-rep]', page).forEach((b) => b.addEventListener('click', () => openReport(c.reports.find((r) => r.id === b.dataset.rep))));
+  $('#leaveBtn').addEventListener('click', async () => {
+    try { await api(`/api/communities/${id}/leave`, { method: 'POST' }); commOpen = null; toast(`You left ${c.name}.`); renderCommunity(); } catch (e) { toast(e.message); }
+  });
+  if (fam) {
+    $('#safeBtn').addEventListener('click', async () => {
+      try { await api(`/api/communities/${id}/safe`, { method: 'POST', body: { safe: true } }); toast('Your family can see you’re safe.'); renderCommunity(); } catch (e) { toast(e.message); }
+    });
+    const cp = $('#copyCode');
+    if (cp) cp.addEventListener('click', () => { try { navigator.clipboard.writeText(c.invite_code); toast('Code copied.'); } catch (e) { toast(c.invite_code); } });
+  }
 }
 async function openReport(r) {
   openSheet(`<h2 id="sheetTitle">${esc(r.title)}</h2>
     <div id="repPhoto"></div>
     <p class="muted small">${esc(KINDS[r.kind] || 'Storm problem')} · ${esc(fmtDay(r.created_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}${r.ai_checked ? ' · checked by AI' : ''}</p>
     ${r.note ? `<p>${esc(r.note)}</p>` : ''}
-    <p><strong>${r.confirmations}</strong> ${r.confirmations === 1 ? 'neighbor has' : 'neighbors have'} confirmed this.</p>
+    <p><strong>${r.confirmations}</strong> ${r.confirmations === 1 ? 'person has' : 'people have'} confirmed this.</p>
+    <div class="res-actions" style="margin-bottom:12px"><a href="https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lon}" target="_blank" rel="noopener">See where it is</a></div>
     <button class="btn btn-primary btn-wide" type="button" id="confirmBtn">I see this too</button>
     <button class="btn btn-ghost btn-wide" type="button" id="clearBtn">It’s cleared now</button>`);
   if (r.has_photo) {
     api(`/api/reports/${r.id}/photo`).then((d) => { const el = $('#repPhoto'); if (el) el.innerHTML = `<img class="report-photo" src="${d.photo}" alt="Photo of ${esc(r.title)}">`; }).catch(() => {});
   }
   $('#confirmBtn').addEventListener('click', async () => {
-    try { const d = await api(`/api/reports/${r.id}/confirm`, { method: 'POST' }); r.confirmations = d.confirmations; closeSheet(); toast('Thanks. Your neighbors can see it’s confirmed.'); } catch (e) { toast(e.message); }
+    try { const d = await api(`/api/reports/${r.id}/confirm`, { method: 'POST' }); r.confirmations = d.confirmations; closeSheet(); toast('Thanks. Others can see it’s confirmed.'); renderCommunity(); } catch (e) { toast(e.message); }
   });
   $('#clearBtn').addEventListener('click', async () => {
-    try { await api(`/api/reports/${r.id}/clear`, { method: 'POST' }); closeSheet(); renderMap(); toast('Marked as cleared.'); } catch (e) { toast(e.message); }
+    try { await api(`/api/reports/${r.id}/clear`, { method: 'POST' }); closeSheet(); renderCommunity(); toast('Marked as cleared.'); } catch (e) { toast(e.message); }
   });
 }
 
@@ -589,10 +767,13 @@ function compress(file, max = 1280, q = 0.72) {
     img.src = url;
   });
 }
-$('#reportFab').addEventListener('click', () => {
-  const draft = { kind: 'flooding', severity: 2, photo: null, ai: false, lat: map ? map.getCenter().lat : plan.lat, lon: map ? map.getCenter().lng : plan.lon };
+function openReportForm(after) {
+  if (!plan) return;
+  const draft = { kind: 'flooding', severity: 2, photo: null, ai: false, where: 'here' };
   openSheet(`<h2 id="sheetTitle">Report a storm problem</h2>
-    <p class="muted small">It goes on the map where the map is centered, so neighbors can avoid it. Don’t take photos in dangerous spots.</p>
+    <p class="muted small">People in your communities will see it. Don’t take photos in dangerous spots.</p>
+    <label class="field-label">Where is it?</label>
+    <div class="sev-row" id="whereRow"><button type="button" data-where="here" aria-pressed="true">Where I am now</button><button type="button" data-where="place" aria-pressed="false">At ${esc(plan.label || 'my place')}</button></div>
     <label class="photo-drop" id="drop"><input type="file" id="repFile" accept="image/*" capture="environment">${icon('camera')}<strong>Add a photo</strong><span class="small">AI will label it for you</span></label>
     <img class="photo-prev" id="repPrev" alt="" hidden>
     <div class="ai-note" id="aiNote" hidden></div>
@@ -602,7 +783,8 @@ $('#reportFab').addEventListener('click', () => {
     <input id="repTitle" type="text" maxlength="60" placeholder="e.g. Water across Main St">
     <label class="field-label">How bad?</label>
     <div class="sev-row" id="sevRow">${[[1, 'Minor'], [2, 'Avoid it'], [3, 'Dangerous']].map(([v, t]) => `<button type="button" data-sev="${v}" aria-pressed="${v === 2}">${t}</button>`).join('')}</div>
-    <button class="btn btn-primary btn-wide" type="button" id="repSend">Post to map</button>`);
+    <button class="btn btn-primary btn-wide" type="button" id="repSend">Post report</button>`);
+  $$('#whereRow button').forEach((b) => b.addEventListener('click', () => { draft.where = b.dataset.where; $$('#whereRow button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
   $('#repFile').addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
@@ -621,15 +803,25 @@ $('#reportFab').addEventListener('click', () => {
   });
   function setSev(v) { draft.severity = v; $$('#sevRow button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.sev === v))); }
   $$('#sevRow button').forEach((b) => b.addEventListener('click', () => setSev(+b.dataset.sev)));
+  const here = () => new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition((p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }), () => resolve(null), { enableHighAccuracy: true, timeout: 10000 });
+  });
   $('#repSend').addEventListener('click', async () => {
     const btn = $('#repSend');
     btn.disabled = true;
+    let spot = { lat: plan.lat, lon: plan.lon };
+    if (draft.where === 'here') {
+      const h = await here();
+      if (h) spot = h; else toast(`Couldn’t get your location, so it’s posted at ${plan.label || 'your place'}.`);
+    }
     try {
-      await api('/api/reports', { method: 'POST', body: { lat: draft.lat, lon: draft.lon, kind: $('#repKind').value, title: $('#repTitle').value.trim(), severity: draft.severity, photo: draft.photo, ai_checked: draft.ai, county: plan.place.county } });
-      closeSheet(); renderMap(); toast('Posted. Thanks for looking out for your neighbors.');
+      await api('/api/reports', { method: 'POST', body: { ...spot, kind: $('#repKind').value, title: $('#repTitle').value.trim(), severity: draft.severity, photo: draft.photo, ai_checked: draft.ai, county: plan.place.county } });
+      closeSheet(); toast('Posted. Thanks for looking out for your community.');
+      if (after) after(); else if (currentView === 'community') renderCommunity();
     } catch (err) { btn.disabled = false; toast(err.message); }
   });
-});
+}
 
 /* ---------------- news ---------------- */
 let newsTab = 'local', newsCache = null, regionsCache = null;
@@ -698,7 +890,7 @@ function switchView(v) {
   currentView = v;
   $$('.view').forEach((el) => el.classList.toggle('active', el.id === `view-${v}`));
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === (v === 'org' ? 'help' : v)));
-  if (v === 'map') renderMap();
+  if (v === 'community') renderCommunity();
   if (v === 'news') renderNews();
   if (v === 'help' && plan) renderHelp();
   const sc = $(`#view-${v}`);

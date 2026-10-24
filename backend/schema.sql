@@ -102,3 +102,40 @@ CREATE TABLE IF NOT EXISTS help_requests (
     updated_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS help_geo ON help_requests (lat, lon);
+
+-- Accounts. A person signs up with a name, email and password. The password is
+-- stored only as a salted hash (werkzeug's scrypt), never as plain text.
+-- device_id is the account's private key for the app: every phone or browser
+-- that logs in uses it, so the account's plans show up everywhere.
+CREATE TABLE IF NOT EXISTS accounts (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    email       TEXT NOT NULL UNIQUE,
+    pw_hash     TEXT NOT NULL,
+    device_id   TEXT NOT NULL UNIQUE,
+    created_at  TEXT NOT NULL
+);
+
+-- Communities: a county (San Mateo County), a city (Millbrae), or a private
+-- family group of up to 5 people that you join with an invite code.
+CREATE TABLE IF NOT EXISTS communities (
+    id            TEXT PRIMARY KEY,
+    kind          TEXT NOT NULL,      -- county, city, family
+    name          TEXT NOT NULL,
+    place_key     TEXT UNIQUE,        -- e.g. "county:CA:San Mateo", NULL for family groups
+    county        TEXT,
+    lat           REAL,
+    lon           REAL,
+    owner_id      TEXT,
+    invite_code   TEXT UNIQUE,        -- family groups only
+    created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS community_members (
+    community_id  TEXT NOT NULL,
+    account_id    TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'member',  -- owner, member
+    safe_at       TEXT,                            -- last "I'm safe" check-in (family groups)
+    joined_at     TEXT NOT NULL,
+    PRIMARY KEY (community_id, account_id)
+);

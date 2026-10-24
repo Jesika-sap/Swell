@@ -15,6 +15,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request, send_from_directory, abort, g
+from werkzeug.security import generate_password_hash, check_password_hash
 
 import config
 import db
@@ -650,6 +651,257 @@ def cancel_help(plan_id, rid):
     own_plan(plan_id)
     db.execute("UPDATE help_requests SET status = 'cancelled', updated_at = ? WHERE id = ? AND plan_id = ?", (now_iso(), rid, plan_id))
     return jsonify(my_requests(plan_id))
+
+
+# ---------------------------------------------------------------- accounts
+#
+# The app has always given each phone a private random device id, and every
+# plan belongs to that id. An account ties a name, email and password to one
+# device id, so logging in on another phone or browser brings your plans with
+# you. Passwords are stored only as salted scrypt hashes.
+
+EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+
+def account_public(a):
+    return {"id": a["id"], "name": a["name"], "email": a["email"]} if a else None
+
+
+def current_account():
+    return db.one("SELECT * FROM accounts WHERE device_id = ?", (g.device,)) if g.device else None
+
+
+def need_account():
+    need_device()
+    a = current_account()
+    if not a:
+        raise BadRequest("Create an account or log in first")
+    return a
+
+
+def _move_device_data(old, new):
+    """Bring plans, reports and help requests made before logging in into the account."""
+    if old and new and old != new:
+        for table in ("plans", "reports", "help_requests"):
+            db.execute(f"UPDATE {table} SET device_id = ? WHERE device_id = ?", (new, old))
+
+
+@app.get("/api/account")
+def get_account():
+    return jsonify({"account": account_public(current_account())})
+
+
+@app.post("/api/account/signup")
+def signup():
+    device = need_device()
+    rate_limit("signup", 10)
+    d = body()
+    name = str(d.get("name") or "").strip()[:40]
+    email = str(d.get("email") or "").strip().lower()[:120]
+    pw = str(d.get("password") or "")
+    if len(name) < 1:
+        raise BadRequest("Add your first name")
+    if not EMAIL_RE.fullmatch(email):
+        raise BadRequest("That email doesn't look right")
+    if len(pw) < 8:
+        raise BadRequest("Use a password with at least 8 characters")
+    if db.one("SELECT id FROM accounts WHERE email = ?", (email,)):
+        raise BadRequest("There's already an account with that email. Log in instead.")
+    if current_account():
+        raise BadRequest("You're already logged in")
+    aid = uuid.uuid4().hex[:12]
+    db.execute("INSERT INTO accounts (id, name, email, pw_hash, device_id, created_at) VALUES (?,?,?,?,?,?)",
+               (aid, name, email, generate_password_hash(pw), device, now_iso()))
+    return jsonify({"account": account_public(db.one("SELECT * FROM accounts WHERE id = ?", (aid,))), "device_id": device}), 201
+
+
+@app.post("/api/account/login")
+def login():
+    need_device()
+    rate_limit("login", 20)
+    d = body()
+    email = str(d.get("email") or "").strip().lower()
+    a = db.one("SELECT * FROM accounts WHERE email = ?", (email,))
+    if not a or not check_password_hash(a["pw_hash"], str(d.get("password") or "")):
+        raise BadRequest("Wrong email or password")
+    if d.get("keep_plans", True) and not current_account():
+        _move_device_data(g.device, a["device_id"])
+    return jsonify({"account": account_public(a), "device_id": a["device_id"]})
+
+
+# ---------------------------------------------------------------- communities
+#
+# Three kinds: your county, your city, and private family groups (up to 5
+# people, joined with an invite code). Inside a community you see the storm
+# reports people posted in that area. County and city communities can only be
+# joined for places you have a plan for, so the list stays local.
+
+FAMILY_MAX = 5
+COUNTY_MILES, CITY_MILES, FAMILY_MILES = 40, 5, 3
+CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O or 1/I mix-ups
+
+
+def _place_communities(device):
+    """County and city communities for every place this person has a plan for."""
+    out = {}
+    for p in db.query("SELECT id, lat, lon, county, city, state, household FROM plans WHERE device_id = ? ORDER BY created_at", (device,)):
+        region = p["state"] or json.loads(p["household"]).get("country") or ""
+        if p["county"]:
+            k = f"county:{region}:{p['county']}"
+            out.setdefault(k, {"key": k, "kind": "county", "name": f"{p['county']} County" if region and len(region) == 2 else p["county"],
+                               "county": p["county"], "lat": p["lat"], "lon": p["lon"]})
+        if p["city"]:
+            k = f"city:{region}:{p['city']}"
+            out.setdefault(k, {"key": k, "kind": "city", "name": p["city"], "county": p["county"], "lat": p["lat"], "lon": p["lon"]})
+    return out
+
+
+def _community_reports(c, member_places=None):
+    if c["kind"] == "family":
+        spots, radius = [(p["lat"], p["lon"]) for p in (member_places or [])], FAMILY_MILES
+    else:
+        spots, radius = [(c["lat"], c["lon"])], COUNTY_MILES if c["kind"] == "county" else CITY_MILES
+    if not spots:
+        return []
+    rows = db.query("""SELECT id, kind, title, note, severity, lat, lon, county, ai_checked, confirmations, created_at,
+                       CASE WHEN photo IS NULL THEN 0 ELSE 1 END AS has_photo
+                       FROM reports WHERE status = 'open' ORDER BY created_at DESC LIMIT 500""")
+    out = []
+    for r in rows:
+        near = min(resources.miles(la, lo, r["lat"], r["lon"]) for la, lo in spots)
+        if c["kind"] == "county":
+            ok = (r["county"] == c["county"] and near <= 80) or near <= 10  # whole county, not just near the center
+        else:
+            ok = near <= radius
+        if ok:
+            r.pop("county", None)
+            out.append({**r, "kind_label": REPORT_KINDS.get(r["kind"], "Storm problem")})
+    return out[:100]
+
+
+def _community_summary(c, account_id):
+    n = db.one("SELECT COUNT(*) AS n FROM community_members WHERE community_id = ?", (c["id"],))["n"]
+    return {"id": c["id"], "kind": c["kind"], "name": c["name"], "members": n,
+            "max_members": FAMILY_MAX if c["kind"] == "family" else None,
+            "owner": c["owner_id"] == account_id}
+
+
+def _membership(cid, account_id):
+    return db.one("SELECT * FROM community_members WHERE community_id = ? AND account_id = ?", (cid, account_id))
+
+
+@app.get("/api/communities")
+def list_communities():
+    need_device()
+    a = current_account()
+    mine = []
+    joined_keys = set()
+    if a:
+        rows = db.query("""SELECT c.* FROM communities c JOIN community_members m ON m.community_id = c.id
+                           WHERE m.account_id = ? ORDER BY c.kind, c.name""", (a["id"],))
+        mine = [_community_summary(c, a["id"]) for c in rows]
+        joined_keys = {c["place_key"] for c in rows if c["place_key"]}
+    suggested = [{"key": s["key"], "kind": s["kind"], "name": s["name"]}
+                 for s in _place_communities(g.device).values() if s["key"] not in joined_keys]
+    return jsonify({"account": account_public(a), "mine": mine, "suggested": suggested, "family_max": FAMILY_MAX})
+
+
+@app.post("/api/communities/join")
+def join_community():
+    a = need_account()
+    rate_limit("join", 30)
+    d = body()
+    if d.get("code"):
+        code = re.sub(r"[^A-Z0-9]", "", str(d["code"]).upper())
+        c = db.one("SELECT * FROM communities WHERE invite_code = ?", (code,))
+        if not c:
+            raise BadRequest("That invite code didn't match a group")
+        n = db.one("SELECT COUNT(*) AS n FROM community_members WHERE community_id = ?", (c["id"],))["n"]
+        if not _membership(c["id"], a["id"]) and n >= FAMILY_MAX:
+            raise BadRequest(f"That group is full ({FAMILY_MAX} people)")
+    else:
+        s = _place_communities(g.device).get(str(d.get("key") or ""))
+        if not s:
+            raise BadRequest("You can join the county and city communities for places you have a plan for")
+        c = db.one("SELECT * FROM communities WHERE place_key = ?", (s["key"],))
+        if not c:
+            cid = uuid.uuid4().hex[:12]
+            db.execute("""INSERT INTO communities (id, kind, name, place_key, county, lat, lon, created_at)
+                          VALUES (?,?,?,?,?,?,?,?)""", (cid, s["kind"], s["name"], s["key"], s["county"], s["lat"], s["lon"], now_iso()))
+            c = db.one("SELECT * FROM communities WHERE id = ?", (cid,))
+    if not _membership(c["id"], a["id"]):
+        db.execute("INSERT INTO community_members (community_id, account_id, role, joined_at) VALUES (?,?,?,?)",
+                   (c["id"], a["id"], "member", now_iso()))
+    return jsonify(_community_summary(c, a["id"])), 201
+
+
+@app.post("/api/communities")
+def create_family():
+    a = need_account()
+    rate_limit("family", 10)
+    d = body()
+    name = str(d.get("name") or "").strip()[:40] or f"{a['name']}'s family"
+    owned = db.one("SELECT COUNT(*) AS n FROM communities WHERE kind = 'family' AND owner_id = ?", (a["id"],))["n"]
+    if owned >= 3:
+        raise BadRequest("You can make up to 3 groups")
+    cid = uuid.uuid4().hex[:12]
+    code = "".join(secrets.choice(CODE_CHARS) for _ in range(6))
+    db.execute("""INSERT INTO communities (id, kind, name, owner_id, invite_code, created_at) VALUES (?,?,?,?,?,?)""",
+               (cid, "family", name, a["id"], code, now_iso()))
+    db.execute("INSERT INTO community_members (community_id, account_id, role, joined_at) VALUES (?,?,?,?)",
+               (cid, a["id"], "owner", now_iso()))
+    return jsonify(_community_summary(db.one("SELECT * FROM communities WHERE id = ?", (cid,)), a["id"])), 201
+
+
+def own_community(cid):
+    a = need_account()
+    c = db.one("SELECT * FROM communities WHERE id = ?", (cid,))
+    if not c or not _membership(cid, a["id"]):
+        abort(404)
+    return a, c
+
+
+@app.get("/api/communities/<cid>")
+def get_community(cid):
+    a, c = own_community(cid)
+    out = _community_summary(c, a["id"])
+    member_places = []
+    if c["kind"] == "family":
+        out["invite_code"] = c["invite_code"]
+        people = []
+        for m in db.query("""SELECT m.role, m.safe_at, m.joined_at, ac.id, ac.name, ac.device_id FROM community_members m
+                             JOIN accounts ac ON ac.id = m.account_id WHERE m.community_id = ? ORDER BY m.joined_at""", (cid,)):
+            places = []
+            for p in db.query("SELECT id, label, city, state, lat, lon, risk FROM plans WHERE device_id = ? ORDER BY created_at", (m["device_id"],)):
+                total = len(json.loads(db.one("SELECT checklist FROM plans WHERE id = ?", (p["id"],))["checklist"]))
+                done = db.one("SELECT COUNT(*) AS n FROM checklist_done WHERE plan_id = ?", (p["id"],))["n"]
+                r = json.loads(p["risk"])
+                places.append({"label": p["label"], "city": p["city"], "level": r["level"], "score": r["score"],
+                               "done": min(done, total), "total": total})
+                member_places.append(p)
+            people.append({"name": m["name"], "role": m["role"], "you": m["id"] == a["id"], "safe_at": m["safe_at"], "places": places})
+        out["people"] = people
+    out["reports"] = _community_reports(c, member_places)
+    return jsonify(out)
+
+
+@app.post("/api/communities/<cid>/leave")
+def leave_community(cid):
+    a, c = own_community(cid)
+    db.execute("DELETE FROM community_members WHERE community_id = ? AND account_id = ?", (cid, a["id"]))
+    if c["kind"] == "family" and not db.one("SELECT 1 AS x FROM community_members WHERE community_id = ?", (cid,)):
+        db.execute("DELETE FROM communities WHERE id = ?", (cid,))
+    return jsonify({"ok": True})
+
+
+@app.post("/api/communities/<cid>/safe")
+def mark_safe(cid):
+    a, c = own_community(cid)
+    if c["kind"] != "family":
+        raise BadRequest("Check-ins are for family groups")
+    db.execute("UPDATE community_members SET safe_at = ? WHERE community_id = ? AND account_id = ?",
+               (now_iso() if body().get("safe", True) else None, cid, a["id"]))
+    return get_community(cid)
 
 
 # ---------------------------------------------------------------- web app

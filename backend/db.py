@@ -67,10 +67,11 @@ def one(q, params=()):
 def init():
     path = os.path.join(os.path.dirname(__file__), "schema.sql")
     with open(path, encoding="utf-8") as f:
-        statements = [s.strip() for s in f.read().split(";") if s.strip()]
-    for s in statements:
-        lines = [ln for ln in s.splitlines() if not ln.strip().startswith("--")]
-        sql = "\n".join(lines).strip()
+        # Drop comments BEFORE splitting on ";" so a semicolon inside a comment
+        # can't cut a statement in half (this bug happened twice).
+        text = "\n".join(ln.split("--", 1)[0] for ln in f.read().splitlines())
+    for s in text.split(";"):
+        sql = s.strip()
         if sql:
             execute(sql)
 

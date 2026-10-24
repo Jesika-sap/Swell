@@ -19,7 +19,7 @@ backend/            Python server (Flask): the API, risk engine, checklist rules
   services/         one file per job: geocode, weather, flood, risk, checklist, resources, news, AI
   data/             hand-checked data: sandbag sites, alert systems, king tides, El Niño status
   schema.sql        database tables
-  tests/            26 automated tests with fake outside services
+  tests/            27 automated tests with fake outside services
   demo_server.py    runs the app offline with fake data (for demos and tests)
 web/                the web app (HTML, CSS, JavaScript), installable on phones
 ios/                the iPhone app (Swift, SwiftUI)
