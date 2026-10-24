@@ -21,13 +21,29 @@ struct Plan: Codable, Identifiable {
     var enso: Enso?
     var missing: [String]?
     var translated: Bool?
+    var role: String?
+    var farm: Farm?
+
+    var isFarm: Bool { role == "farmer" }
+    var isDrought: Bool { risk.hazard == "drought" }
+    var inUS: Bool { (place.country ?? "US") == "US" }
+}
+
+struct Farm: Codable {
+    var grows: [String]
+    var workers: Bool
+    var creek: Bool
 }
 
 struct Place: Codable {
     var county: String?
     var city: String?
     var state: String?
-    var line: String { [city, county.map { "\($0) County" }, state].compactMap { $0 }.joined(separator: ", ") }
+    var country: String?
+    var line: String {
+        let c = (country ?? "US") == "US" ? nil : country
+        return [city, county.map { c == nil ? "\($0) County" : $0 }, state, c].compactMap { $0 }.joined(separator: ", ")
+    }
 }
 
 struct Risk: Codable {
@@ -35,6 +51,15 @@ struct Risk: Codable {
     let level: String          // high, elevated, lower
     let factors: [Factor]
     var kingTides: [TideWindow]?
+    var hazard: String?        // flood or drought
+    var region: RegionInfo?
+}
+
+struct RegionInfo: Codable {
+    let id: String
+    let name: String
+    let effect: String
+    let season: String
 }
 
 struct Factor: Codable, Identifiable {
@@ -61,6 +86,7 @@ struct PlanTask: Codable, Identifiable {
     let priority: Int
     var link: String?
     var done: Bool?
+    var source: String?        // "scan" when AI Scan added it
 }
 
 struct PlanProgress: Codable {
@@ -90,6 +116,7 @@ struct Help: Codable {
     var alertSystem: AlertSystem?
     var county: [Resource]?
     var statewide: [Resource]?
+    var country: [Resource]?
     var sandbags: [SandbagSite]?
     var ai: AIHelp?
     var checked: String?
@@ -206,6 +233,105 @@ struct Region: Codable, Identifiable {
     let effect: String
     let impact: String
     let prepare: String
+}
+
+// MARK: AI Scan
+
+struct ScanResult: Codable {
+    let seen: String
+    let added: [PlanTask]
+    let plan: Plan
+}
+
+// MARK: organizations and help requests
+
+/// Kinds of help, in the same order and with the same ids as the server's SERVICES.
+let services: [(id: String, name: String, symbol: String)] = [
+    ("sandbags", "Sandbags or sandbagging help", "square.stack.3d.up"),
+    ("rides", "Rides or help leaving", "car"),
+    ("checks", "Check-in calls and visits", "phone"),
+    ("shelter", "A place to stay", "house"),
+    ("food", "Food and water", "drop"),
+    ("translation", "Translation", "character.bubble"),
+    ("farm", "Help on farms (animals, equipment)", "leaf"),
+    ("cleanup", "Volunteers for cleanup", "person.3"),
+    ("supplies", "Supplies (batteries, tarps, masks)", "shippingbox"),
+]
+
+struct Org: Codable, Identifiable {
+    let id: String
+    let name: String
+    var about: String?
+    var area: String?
+    var email: String?
+    var phone: String?
+    var website: String?
+    let radiusMiles: Double
+    let services: [String]
+    let verified: Bool
+    let example: Bool
+    var miles: Double?
+}
+
+struct HelpRequest: Codable, Identifiable {
+    let id: String
+    let need: String
+    let needLabel: String
+    var details: String?
+    let status: String         // open, accepted, done
+    var org: Org?
+    let createdAt: String
+}
+
+struct OrgRequest: Codable, Identifiable {
+    let id: String
+    let need: String
+    let needLabel: String
+    var details: String?
+    let status: String
+    var area: String?
+    var contact: String?
+    let mine: Bool
+    let createdAt: String
+}
+
+struct OrgDashboard: Codable {
+    let org: Org
+    let requests: [OrgRequest]
+    let helped: Int
+}
+
+struct NewOrg: Codable {
+    let org: Org
+    let key: String
+}
+
+enum Role: String, CaseIterable, Identifiable {
+    case household, farmer
+    var id: String { rawValue }
+}
+
+enum FarmGrow: String, CaseIterable, Identifiable {
+    case vegetables, field, orchard, livestock, nursery
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .vegetables: "Vegetables"
+        case .field: "Rice, wheat or field crops"
+        case .orchard: "Fruit trees or vines"
+        case .livestock: "Animals"
+        case .nursery: "Greenhouse or nursery"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .vegetables: "carrot"
+        case .field: "laurel.leading"
+        case .orchard: "tree"
+        case .livestock: "hare"
+        case .nursery: "house.lodge"
+        }
+    }
 }
 
 enum Household: String, CaseIterable, Identifiable {

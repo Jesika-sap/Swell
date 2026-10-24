@@ -24,13 +24,14 @@ final class APIClient {
         return d
     }()
 
-    private func request(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Data {
+    private func request(_ path: String, method: String = "GET", body: [String: Any]? = nil, orgKey: String? = nil) async throws -> Data {
         guard let url = URL(string: path, relativeTo: Config.apiBase) else { throw APIError(message: "Bad address") }
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.timeoutInterval = 45 // the free server can take a moment to wake up
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(deviceId, forHTTPHeaderField: "X-Device-Id")
+        if let orgKey { req.setValue(orgKey, forHTTPHeaderField: "X-Org-Key") }
         if let body { req.httpBody = try JSONSerialization.data(withJSONObject: body) }
         let (data, resp) = try await URLSession.shared.data(for: req)
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -51,10 +52,44 @@ final class APIClient {
 
     // MARK: endpoints
 
-    func buildPlan(address: String, label: String, language: String, household: Set<Household>) async throws -> Plan {
+    func buildPlan(address: String, label: String, language: String, household: Set<Household>,
+                   role: Role, grows: Set<FarmGrow>, workers: Bool, creek: Bool) async throws -> Plan {
         var hh: [String: Bool] = [:]
         for h in Household.allCases { hh[h.rawValue] = household.contains(h) }
-        return try await post("/api/plan", ["address": address, "label": label, "language": language, "household": hh])
+        var body: [String: Any] = ["address": address, "label": label, "language": language, "household": hh, "role": role.rawValue]
+        if role == .farmer {
+            body["farm"] = ["grows": grows.map(\.rawValue), "workers": workers, "creek": creek] as [String: Any]
+        }
+        return try await post("/api/plan", body)
+    }
+
+    // AI Scan: the server looks at the photo and adds what it finds to the checklist.
+    func scan(plan: String, photo: String) async throws -> ScanResult {
+        try await post("/api/plan/\(plan)/scan", ["photo": photo])
+    }
+
+    // Help requests from this plan
+    func myRequests(plan: String) async throws -> [HelpRequest] { try await get("/api/plan/\(plan)/help") }
+
+    func askForHelp(plan: String, need: String, details: String, contact: String) async throws -> [HelpRequest] {
+        try await post("/api/plan/\(plan)/help", ["need": need, "details": details, "contact": contact])
+    }
+
+    func cancelHelp(plan: String, request rid: String) async throws -> [HelpRequest] {
+        try await decoder.decode([HelpRequest].self, from: try await request("/api/plan/\(plan)/help/\(rid)/cancel", method: "POST"))
+    }
+
+    // Organizations
+    func orgs(lat: Double, lon: Double) async throws -> [Org] { try await get("/api/orgs?lat=\(lat)&lon=\(lon)") }
+
+    func createOrg(_ fields: [String: Any]) async throws -> NewOrg { try await post("/api/orgs", fields) }
+
+    func dashboard(org: String, key: String) async throws -> OrgDashboard {
+        try decoder.decode(OrgDashboard.self, from: try await request("/api/orgs/\(org)/dashboard", orgKey: key))
+    }
+
+    func orgAct(org: String, key: String, request rid: String, action: String) async throws {
+        _ = try await request("/api/orgs/\(org)/requests/\(rid)/\(action)", method: "POST", orgKey: key)
     }
 
     func plan(_ id: String) async throws -> Plan { try await get("/api/plan/\(id)") }

@@ -1,8 +1,9 @@
 import Foundation
 
 enum Config {
-    /// The Python server. After deploying on Render, paste its address here.
-    /// For the iPhone Simulator with the server running on your Mac, use "http://localhost:5000".
-    static let apiBase = URL(string: "https://swell.onrender.com")!
+    /// The Python server.
+    /// Running the server on this Mac (Terminal: `PORT=5050 python3 app.py`) and using the Simulator: keep "http://localhost:5050".
+    /// After putting the server online (for example on Render), paste that address here instead.
+    static let apiBase = URL(string: "http://localhost:5050")!
     static let appName = "Swell"
 }

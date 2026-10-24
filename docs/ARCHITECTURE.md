@@ -1,9 +1,11 @@
 # Swell architecture
 
-Swell helps a household get ready for the 2026–27 El Niño. You give it an address, and it returns:
-- a storm risk score built from official public data, with every point explained
-- a checklist for your household, in your language
-- the nearest places to get sandbags and help
+Swell helps households and farmers get ready for the 2026–27 El Niño, anywhere in the world. You say who the plan is for (a home or a farm) and give it an address, and it returns:
+- a risk score built from official public data, with every point explained. In California El Niño means floods; in Nepal and much of South Asia it means drought, and the plan changes to match.
+- a checklist for your household or farm, in your language
+- AI Scan: a photo of your home, yard or farm becomes new checklist steps
+- a way to ask local organizations for help, and a dashboard for organizations to accept requests
+- the nearest places to get sandbags and official help
 - live alerts, El Niño news with sources, and a map where neighbors report flooding
 
 This document explains how it's built and why. It's updated with every new feature (see the change log at the bottom).
@@ -17,15 +19,18 @@ flowchart LR
     I[iPhone app<br/>Swift + SwiftUI]
   end
   subgraph Server["Python server (Flask) on Render"]
-    API[REST API<br/>/api/plan, /api/news, /api/reports]
+    API[REST API<br/>/api/plan, /api/news, /api/reports,<br/>/api/orgs, /api/plan/id/help, /api/plan/id/scan]
+    REG[Region rules<br/>region.py: flood or drought]
     R[Risk engine<br/>risk.py]
     C[Checklist rules<br/>checklist.py]
-    AI[AI layer<br/>gemini.py, ai_plan.py,<br/>news.py, photo_ai.py]
+    AI[AI layer<br/>gemini.py, ai_plan.py,<br/>news.py, photo_ai.py, scan.py]
+    O[Organizations and<br/>help requests]
     H[Help finder<br/>resources.py]
   end
-  DB[(PostgreSQL<br/>plans, checklist,<br/>reports, cache)]
+  DB[(PostgreSQL<br/>plans, checklist, reports,<br/>orgs, help_requests, cache)]
   subgraph Public data
     CEN[U.S. Census Geocoder]
+    OSM[OpenStreetMap Nominatim<br/>outside the U.S.]
     FEMA[FEMA Flood Hazard Layer]
     USGS[USGS Elevation]
     NWS[National Weather Service]
@@ -33,10 +38,10 @@ flowchart LR
   G[Google Gemini<br/>+ Google Search grounding]
   W -- HTTPS JSON --> API
   I -- HTTPS JSON --> API
-  API --> R & C & H & AI
+  API --> REG & R & C & H & AI & O
   API <--> DB
   R --> FEMA & USGS & NWS
-  API --> CEN
+  API --> CEN & OSM
   AI --> G
 ```
 
@@ -47,9 +52,9 @@ flowchart LR
 | **Clients** | What people tap and see. Both apps share the same server, so a plan made on the web shows up on the phone. | Web: HTML, CSS, JavaScript (PWA). iPhone: Swift, SwiftUI, MapKit, PhotosUI |
 | **API** | One set of web addresses (`/api/...`) that both apps call. Checks inputs, enforces rate limits, and keeps each device's plans private. | Python 3.12, Flask |
 | **Logic** | Turns raw data into decisions. The risk score and checklist are plain Python rules, so they're predictable and testable. | `risk.py`, `checklist.py`, `resources.py` |
-| **AI** | Language and judgment: rewrites the checklist in 10 languages, finds and summarizes news with real source links, and labels flood photos. | Google Gemini API, Google Search grounding |
-| **Data** | Saved plans, checklist progress, neighbor reports, and a cache of outside answers. | PostgreSQL in production, SQLite on a laptop (same SQL) |
-| **Public data** | Official facts about a location. | U.S. Census Geocoder, FEMA NFHL, USGS EPQS, NWS API |
+| **AI** | Language and judgment: rewrites the checklist in 10 languages, finds and summarizes news with real source links, labels flood photos, and turns AI Scan photos into checklist steps. | Google Gemini API, Google Search grounding |
+| **Data** | Saved plans, checklist progress, neighbor reports, organizations, help requests, and a cache of outside answers. | PostgreSQL in production, SQLite on a laptop (same SQL) |
+| **Public data** | Official facts about a location. | U.S. Census Geocoder, FEMA NFHL, USGS EPQS, NWS API, OpenStreetMap Nominatim, NOAA Climate Prediction Center (regional El Niño effects) |
 
 ## Why I chose each technology
 
@@ -63,8 +68,10 @@ flowchart LR
 
 ## What happens when you build a plan (`POST /api/plan`)
 
+0. **Who is it for?** The app sends a role: `household` or `farmer`. Farmers also say what they grow or raise, whether people work on the farm, and whether there's a creek or canal nearby.
 1. **Find the place.** The Census Geocoder turns the address into coordinates, county and city. If it can't match, OpenStreetMap Nominatim is tried next. "Use my location" goes the other way, with reverse geocoding.
-2. **Collect live data.** Each source is fetched on its own with a timeout, so if one fails, the rest still work:
+   **Pick the hazard** (`region.py`). The place's state or country maps to one of 10 world regions from NOAA's Climate Prediction Center. If El Niño makes that region drier (Nepal, India, Bangladesh, Indonesia, Australia and others), the plan is a **drought** plan. Otherwise it's a **flood** plan.
+2. **Collect live data** (U.S. only). Each source is fetched on its own with a timeout, so if one fails, the rest still work:
    - FEMA flood zone at that exact point
    - USGS ground elevation in feet
    - NWS active alerts and 7-day forecast
@@ -78,11 +85,12 @@ flowchart LR
    | King tides on low ground in a Bay Area county | +10 |
    | NWS storm warning / watch / advisory | +30 / +15 / +8 |
    | 70%+ / 50%+ chance of rain this week | +10 / +5 |
-   | Strong El Niño forecast for California | +5 |
+   | Strong El Niño forecast: California / other El Niño regions | +5 / +20 |
+   | Farm or ranch (income depends on the weather) | +10 |
 
    55 or more is **High**, 30–54 is **Elevated**, and under 30 is **Lower**.
 4. **Find help** (`resources.py`). This pulls the county's official alert system (for example SMC Alert) and hand-checked sandbag sites. Each site's address is geocoded and sorted by real distance using the haversine formula. For counties not checked by hand yet, an AI web search finds sites, and the app labels them "Found by AI search, confirm before you go," with source links.
-5. **Build the checklist** (`checklist.py`). Rules choose the tasks from the risk factors and the household: older adults, no car, powered medical devices, pets, renters, hillside homes and more. Tasks are grouped as *Do this week*, *Have at home*, and *If a storm hits*.
+5. **Build the checklist** (`checklist.py`). Rules choose the tasks from the hazard, the role, the risk factors and the household: older adults, no car, powered medical devices, pets, renters and hillside homes. Farm plans add tasks for crops, animals, workers and water, with links to USDA disaster programs in the U.S. Drought plans focus on storing water, drought-tolerant seed and a late monsoon, with Nepal's own government sources. Tasks are grouped as *Do this week*, *Have at home*, and *If a storm hits*.
 6. **Personalize with AI** (`ai_plan.py`). Gemini rewrites the tasks in the household's language and writes a two-sentence summary. **Guardrail:** the server checks that the AI returned exactly the same task ids. If it dropped or added a task, the AI version is thrown out and the original is kept. Safety numbers (gallons, inches, days, phone numbers) must stay unchanged.
 7. **Save and return.** The plan is saved under the device's anonymous id, and the app gets everything in one JSON response.
 
@@ -96,7 +104,13 @@ reports          id, device_id, kind, title, note, severity, lat, lon, county,
                  photo, ai_checked, confirmations, status, created_at
 report_confirms  report_id, device_id                       (one "I see this too" per device)
 cache            key, value (JSON), expires_at              (saved outside answers)
+orgs             id, name, about, services (JSON), area, lat, lon, radius_miles,
+                 email, phone, website, verified, example, key_hash, created_at
+help_requests    id, plan_id, device_id, need, details, contact, lat, lon, area,
+                 status (open, accepted, done, cancelled), org_id, created_at, updated_at
 ```
+
+**Matching help.** When someone asks for help, every organization that offers that kind of help, and whose service area (a radius in miles) covers the person, sees the request. The first to tap "I can help" gets it.
 
 **Caching.** Flood zones and elevation barely change, so they're cached for 30 days. Alerts are cached for 5 minutes, the forecast for 1 hour, and news for 6 hours. This keeps the app fast and inside the free limits of every outside service. A test proves a second plan for the same address makes no new FEMA calls.
 
@@ -117,11 +131,22 @@ cache            key, value (JSON), expires_at              (saved outside answe
 | `POST /api/reports` | Post a report |
 | `POST /api/reports/{id}/confirm` | "I see this too" (once per device) |
 | `POST /api/reports/{id}/clear` | Mark a report cleared |
+| `POST /api/plan/{id}/scan` | AI Scan: look at a photo and add what it finds to the checklist |
+| `GET /api/plan/{id}/help` | This plan's help requests and who accepted them |
+| `POST /api/plan/{id}/help` | Ask for help (kind, details, contact) |
+| `POST /api/plan/{id}/help/{rid}/cancel` | Cancel a request |
+| `GET /api/orgs?lat=&lon=` | Organizations whose service area covers this spot |
+| `POST /api/orgs` | An organization signs up and gets a private key (shown once) |
+| `GET /api/orgs/{id}/dashboard` | Requests near the organization (needs its key) |
+| `POST /api/orgs/{id}/requests/{rid}/accept, done, release` | Accept, finish or give back a request (needs its key) |
+| `POST /api/orgs/{id}/verify` | Swell team marks an organization verified (needs the admin token) |
 
 ## Privacy and safety
 
 - **No accounts and no names.** The app makes a random device id on first launch. Plans are only visible to that device. A test checks that another device gets "not found."
 - **Secret keys live only on the server,** in environment variables. `.gitignore` keeps `.env` files out of GitHub.
+- **Help requests protect location.** Organizations that haven't accepted a request see only a rough area (coordinates rounded to about half a mile) and no contact. Only the group that accepts sees the exact spot and phone or email.
+- **Organization keys are never stored.** The server keeps only a SHA-256 hash of each key and compares with a constant-time check. On iPhone, the key is saved in the Keychain. Organizations show as unverified until an admin with a separate secret token verifies them.
 - **Every database value is passed as a parameter,** never pasted into SQL, which prevents SQL injection.
 - **Inputs are checked.** Coordinates must be in range, photos must be compressed JPEGs under about 700 KB, and requests are capped at 2 MB.
 - **Rate limits** on AI and data routes protect the free quotas.
@@ -130,7 +155,7 @@ cache            key, value (JSON), expires_at              (saved outside answe
 
 ## Testing
 
-`backend/tests/` has 20 automated tests (Python `unittest`). They run offline with fake versions of every outside service that return the same JSON shapes as the real ones. They cover:
+`backend/tests/` has 26 automated tests (Python `unittest`). They run offline with fake versions of every outside service that return the same JSON shapes as the real ones. They cover:
 - **Risk scoring:** a Bayfront home, a hillside home, past king tides being dropped, and FEMA zone wording.
 - **Checklist rules:** household needs adding tasks, and a low-risk home still getting the basics.
 - **The full plan flow,** including the Spanish version.
@@ -138,6 +163,9 @@ cache            key, value (JSON), expires_at              (saved outside answe
 - **Outages:** a plan is still built when FEMA, USGS, the weather service and the AI are all down.
 - **Bad inputs, privacy between devices, and AI help search with sources.**
 - **News with sources, the report flow** (including once-per-device confirmations and rejected non-photo uploads), and caching.
+- **Farmers and regions:** a California farmer gets a flood farm plan, and a farmer in Chitwan, Nepal gets a drought plan.
+- **AI Scan:** a scan adds tasks to the checklist, and scanning the same photo twice doesn't add them twice.
+- **Organizations and help:** the full flow (ask, match, accept, contact revealed only to the accepting group, done), verification needing the admin token, and sign-up checks.
 
 Browser tests (Playwright) click through the whole web app in light and dark mode: onboarding, plan, checklist, help, report with photo, news, and a second place in Spanish.
 
@@ -159,9 +187,12 @@ python -m unittest discover tests -v
 - **Push notifications** when the NWS issues a warning for a saved place, using a scheduled job that checks each saved plan.
 - **iPhone app on the App Store** after testing with families, then Android.
 - **Text-message (SMS) version** for people without smartphones or data, and in-app voice reading of the plan for people who don't read well.
-- **A Nepal version.** El Niño often weakens the monsoon in South Asia, so that version would focus on drought and heat for farming families, built with partners there.
-- **Partnering with San Mateo County's El Niño task force and OneShoreline,** so neighbor flood reports can reach public works crews.
+- **A full Nepal version.** Swell already builds drought plans in Nepali. Next: work with farmers there, add Nepal's weather alerts, and support SMS for phones without data.
+- **Bringing Swell to San Mateo County's new storm-season task force and OneShoreline,** so neighbor flood reports can reach public works crews.
+- **Real partner organizations,** starting with SVYCA San Mateo County, verified before they appear as trusted.
 - **More counties:** hand-check sandbag sites across California.
 
 ## Change log
 - **Oct 23, 2026:** Python API, database, risk engine, checklist rules, AI translation with guardrail, help finder, news, neighbor reports, web app, and 20 tests.
+- **Oct 23, 2026:** Renamed to Swell. Added the farmer role, drought plans for South Asia and other El Niño regions, AI Scan, organizations and help requests. 26 tests.
+- **Oct 23, 2026:** iPhone app caught up with the web app: home or farm, farm details, AI Scan, region card, ask for help, and the organization dashboard.

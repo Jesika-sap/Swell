@@ -1,8 +1,10 @@
 import SwiftUI
+import PhotosUI
 
 struct PlanView: View {
     @Environment(AppStore.self) private var store
     @State private var places: [PlanSummary] = []
+    @State private var scanning = false
 
     var body: some View {
         if let plan = store.plan {
@@ -10,8 +12,16 @@ struct PlanView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     RiskCard(plan: plan)
 
+                    if let r = plan.risk.region, !plan.inUS {
+                        RegionCard(region: r, drought: plan.isDrought)
+                    }
+
+                    ScanCard { scanning = true }
+
                     let storm = (plan.alerts ?? []).filter { $0.stormRelated ?? false }
-                    if storm.isEmpty {
+                    if !plan.inUS {
+                        EmptyView()
+                    } else if storm.isEmpty {
                         AlertBox(title: "No storm alerts right now", text: "We check the National Weather Service every time you open the app.", color: .green, symbol: "checkmark.circle")
                     } else {
                         ForEach(storm) { a in
@@ -107,6 +117,7 @@ struct PlanView: View {
             .navigationTitle(plan.label ?? "My plan")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await store.loadSaved() }
+            .sheet(isPresented: $scanning) { ScanSheet() }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
@@ -153,7 +164,7 @@ struct RiskCard: View {
                     Text(Theme.levelText(plan.risk.level)).font(.caption.weight(.heavy))
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .background(Theme.level(plan.risk.level).opacity(0.9), in: Capsule()).foregroundStyle(.black.opacity(0.75))
-                    Text("Storm risk for \(plan.label ?? "this home")").font(.title3.bold())
+                    Text("\(plan.isDrought ? "Drought" : "Storm") risk for \(plan.label ?? (plan.isFarm ? "this farm" : "this home"))").font(.title3.bold())
                     Text(plan.place.line).font(.subheadline).opacity(0.75)
                 }
             }
@@ -222,7 +233,12 @@ struct TaskRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(done ? "Mark not done" : "Mark done")
             VStack(alignment: .leading, spacing: 3) {
-                if task.priority == 1 && !done { Text("DO FIRST").font(.caption2.weight(.heavy)).foregroundStyle(.red) }
+                HStack(spacing: 6) {
+                    if task.priority == 1 && !done { Text("DO FIRST").font(.caption2.weight(.heavy)).foregroundStyle(.red) }
+                    if task.source == "scan" {
+                        Label("Found by AI Scan", systemImage: "camera.viewfinder").font(.caption2.weight(.heavy)).foregroundStyle(Theme.sea)
+                    }
+                }
                 Text(task.title).bold().strikethrough(done).foregroundStyle(done ? .secondary : .primary)
                 Text(task.why).font(.subheadline).foregroundStyle(.secondary)
                 if let link = task.link, let url = URL(string: link) { SwiftUI.Link("Open link", destination: url).font(.subheadline.bold()) }
@@ -239,5 +255,108 @@ extension View {
         padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+
+struct RegionCard: View {
+    let region: RegionInfo
+    let drought: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(drought ? "El Niño here means drought" : "El Niño here means heavy rain", systemImage: drought ? "sun.max.trianglebadge.exclamationmark" : "cloud.heavyrain")
+                .font(.headline).foregroundStyle(drought ? .orange : Theme.sea)
+            Text(region.name).font(.subheadline.bold())
+            Text(region.effect).font(.subheadline)
+            Text("When: \(region.season)").font(.caption).foregroundStyle(.secondary)
+            Text("Source: NOAA Climate Prediction Center").font(.caption).foregroundStyle(.secondary)
+        }
+        .card()
+    }
+}
+
+struct ScanCard: View {
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: "camera.viewfinder").font(.largeTitle).foregroundStyle(.white)
+                    .frame(width: 58, height: 58).background(Theme.sea, in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("AI Scan").font(.headline).foregroundStyle(.primary)
+                    Text("Take a photo of your home, yard or farm. AI spots risks you can see and adds them to your checklist.")
+                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+            }
+            .card()
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct ScanSheet: View {
+    @Environment(AppStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var item: PhotosPickerItem?
+    @State private var preview: UIImage?
+    @State private var working = false
+    @State private var result: ScanResult?
+    @State private var errorText: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let preview {
+                        Image(uiImage: preview).resizable().scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: 240).clipShape(RoundedRectangle(cornerRadius: 16))
+                    }
+                    if working {
+                        HStack(spacing: 10) { ProgressView(); Text("Looking for risks…") }
+                    } else if let result {
+                        Text("What AI sees").font(.caption.bold()).foregroundStyle(.secondary)
+                        Text(result.seen).font(.subheadline)
+                        if result.added.isEmpty {
+                            Text("No new risks spotted in this photo. Try another angle, like gutters, drains, doors or water storage.").foregroundStyle(.secondary)
+                        } else {
+                            Text("Added \(result.added.count) to the top of your checklist").font(.headline)
+                            ForEach(result.added) { t in TaskRow(task: t) }
+                        }
+                    } else {
+                        Text("Point your camera at the outside of your home, a drain, your roof gutters, a water tank or a field. AI looks for risks you can see and turns them into checklist steps.")
+                            .foregroundStyle(.secondary)
+                    }
+                    if let errorText { Text(errorText).foregroundStyle(.red) }
+                    PhotosPicker(selection: $item, matching: .images) {
+                        Label(result == nil ? "Choose a photo" : "Scan another photo", systemImage: "photo.on.rectangle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent).controlSize(.large).disabled(working)
+                    Text("AI can miss things. Your checklist from official data still comes first.").font(.caption).foregroundStyle(.secondary)
+                }
+                .padding()
+            }
+            .navigationTitle("AI Scan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .onChange(of: item) { _, newItem in Task { await run(newItem) } }
+        }
+    }
+
+    private func run(_ newItem: PhotosPickerItem?) async {
+        guard let newItem, let data = try? await newItem.loadTransferable(type: Data.self), let img = UIImage(data: data) else { return }
+        let small = img.resized(maxSide: 1024)
+        guard let jpeg = small.jpegData(compressionQuality: 0.7) else { return }
+        preview = small
+        working = true
+        errorText = nil
+        do {
+            result = try await store.scan(photo: "data:image/jpeg;base64," + jpeg.base64EncodedString())
+        } catch {
+            errorText = error.localizedDescription
+        }
+        working = false
     }
 }

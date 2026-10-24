@@ -54,12 +54,22 @@ final class AppStore {
         await loadSaved()
     }
 
-    func build(address: String, label: String, household: Set<Household>) async throws {
-        let p = try await APIClient.shared.buildPlan(address: address, label: label, language: language, household: household)
+    func build(address: String, label: String, household: Set<Household>,
+               role: Role, grows: Set<FarmGrow>, workers: Bool, creek: Bool) async throws {
+        let p = try await APIClient.shared.buildPlan(address: address, label: label, language: language, household: household,
+                                                     role: role, grows: grows, workers: workers, creek: creek)
         plan = p
         setCurrent(p.id)
         addingPlace = false
         error = nil
+    }
+
+    /// AI Scan: send a photo, get new tasks added to the top of the checklist.
+    func scan(photo: String) async throws -> ScanResult {
+        guard let p = plan else { throw APIError(message: "Make a plan first") }
+        let result = try await APIClient.shared.scan(plan: p.id, photo: photo)
+        plan = result.plan
+        return result
     }
 
     /// Check a task off right away, then save it on the server (and undo if that fails).
