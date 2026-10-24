@@ -1,0 +1,10 @@
+{
+  "note": "King tide windows for the San Francisco Bay and San Mateo County coast, from San Mateo County Parks (Oct 20, 2026). Ocean levels this winter are running 1 to 2 feet above tide tables, so low streets near the Bay can flood even on sunny days.",
+  "source": {"title": "San Mateo County Parks: Super El Niño, high tides and possible flooding", "url": "https://www.smcgov.org/parks/news/super-el-nino-high-tides-and-possible-flooding-expected-fallwinter"},
+  "counties": ["San Mateo", "San Francisco", "Marin", "Alameda", "Contra Costa", "Santa Clara", "Solano", "Sonoma", "Napa"],
+  "windows": [
+    {"start": "2026-11-21", "end": "2026-11-28"},
+    {"start": "2026-12-20", "end": "2026-12-27"},
+    {"start": "2027-01-17", "end": "2027-01-24"}
+  ]
+}

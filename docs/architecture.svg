@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" font-family="Figtree, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#5b6f7c"/></marker>
+    <style>
+      .t{font-size:20px;font-weight:800;fill:#0b3349}
+      .s{font-size:14.5px;fill:#3d5260}
+      .h{font-size:13px;font-weight:800;letter-spacing:.12em;fill:#5b6f7c}
+      .ln{stroke:#5b6f7c;stroke-width:2.2;fill:none;marker-end:url(#a)}
+    </style>
+  </defs>
+  <rect width="1200" height="720" fill="#f3f6f8"/>
+  <text x="40" y="52" font-size="30" font-weight="800" fill="#0b3349">Tideline: how it works</text>
+  <text x="40" y="80" class="s">One Python server, shared by the web app and the iPhone app. Secrets and AI stay on the server.</text>
+
+  <!-- clients -->
+  <text x="40" y="128" class="h">APPS PEOPLE USE</text>
+  <rect x="40" y="140" width="250" height="110" rx="16" fill="#fff" stroke="#c9d5dd" stroke-width="1.5"/>
+  <text x="60" y="176" class="t">Web app</text>
+  <text x="60" y="202" class="s">HTML · CSS · JavaScript</text>
+  <text x="60" y="224" class="s">Installable, works offline</text>
+  <rect x="40" y="270" width="250" height="110" rx="16" fill="#fff" stroke="#c9d5dd" stroke-width="1.5"/>
+  <text x="60" y="306" class="t">iPhone app</text>
+  <text x="60" y="332" class="s">Swift · SwiftUI · MapKit</text>
+  <text x="60" y="354" class="s">Camera reports, native maps</text>
+
+  <!-- server -->
+  <text x="370" y="128" class="h">PYTHON SERVER (FLASK) ON RENDER</text>
+  <rect x="370" y="140" width="470" height="420" rx="20" fill="#0b3349"/>
+  <rect x="390" y="160" width="430" height="64" rx="12" fill="#12506e"/>
+  <text x="410" y="188" font-size="18" font-weight="800" fill="#fff">REST API  /api/plan · /news · /reports</text>
+  <text x="410" y="210" font-size="13.5" fill="#cfe3ec">Input checks · rate limits · device privacy</text>
+  <g font-size="16" font-weight="800" fill="#fff">
+    <rect x="390" y="240" width="208" height="90" rx="12" fill="#164660"/>
+    <text x="406" y="270">Risk engine</text>
+    <text x="406" y="294" font-size="13" font-weight="500" fill="#cfe3ec">0–100 score, every</text>
+    <text x="406" y="312" font-size="13" font-weight="500" fill="#cfe3ec">point has a source</text>
+    <rect x="612" y="240" width="208" height="90" rx="12" fill="#164660"/>
+    <text x="628" y="270">Checklist rules</text>
+    <text x="628" y="294" font-size="13" font-weight="500" fill="#cfe3ec">Tasks chosen from risk</text>
+    <text x="628" y="312" font-size="13" font-weight="500" fill="#cfe3ec">and household needs</text>
+    <rect x="390" y="344" width="208" height="90" rx="12" fill="#164660"/>
+    <text x="406" y="374">Help finder</text>
+    <text x="406" y="398" font-size="13" font-weight="500" fill="#cfe3ec">Sandbag sites by real</text>
+    <text x="406" y="416" font-size="13" font-weight="500" fill="#cfe3ec">distance (haversine)</text>
+    <rect x="612" y="344" width="208" height="90" rx="12" fill="#0e7486"/>
+    <text x="628" y="374">AI layer</text>
+    <text x="628" y="398" font-size="13" font-weight="500" fill="#e2f6f8">10 languages · news with</text>
+    <text x="628" y="416" font-size="13" font-weight="500" fill="#e2f6f8">sources · photo labels</text>
+  </g>
+  <rect x="390" y="448" width="430" height="92" rx="12" fill="#fff" fill-opacity=".08" stroke="#3ec4d6" stroke-dasharray="6 5"/>
+  <text x="410" y="478" font-size="15" font-weight="800" fill="#3ec4d6">AI guardrail</text>
+  <text x="410" y="502" font-size="13.5" fill="#e2f6f8">Rules decide WHAT is on the checklist. AI only decides</text>
+  <text x="410" y="522" font-size="13.5" fill="#e2f6f8">HOW it's said, and the server rejects answers that change it.</text>
+
+  <!-- database -->
+  <text x="370" y="600" class="h">DATABASE</text>
+  <rect x="370" y="612" width="470" height="80" rx="16" fill="#fff" stroke="#c9d5dd" stroke-width="1.5"/>
+  <text x="390" y="646" class="t">PostgreSQL</text>
+  <text x="390" y="672" class="s">plans · checklist progress · neighbor reports · cache</text>
+
+  <!-- outside -->
+  <text x="910" y="128" class="h">OFFICIAL DATA (FREE)</text>
+  <g>
+    <rect x="910" y="140" width="250" height="62" rx="12" fill="#fff" stroke="#c9d5dd" stroke-width="1.5"/>
+    <text x="928" y="168" font-size="16" font-weight="800" fill="#0b3349">U.S. Census Geocoder</text><text x="928" y="190" class="s">address → county, city</text>
+    <rect x="910" y="214" width="250" height="62" rx="12" fill="#fff" stroke="#c9d5dd" stroke-width="1.5"/>
+    <text x="928" y="242" font-size="16" font-weight="800" fill="#0b3349">FEMA flood maps</text><text x="928" y="264" class="s">flood zone at the point</text>
+    <rect x="910" y="288" width="250" height="62" rx="12" fill="#fff" stroke="#c9d5dd" stroke-width="1.5"/>
+    <text x="928" y="316" font-size="16" font-weight="800" fill="#0b3349">USGS elevation</text><text x="928" y="338" class="s">ground height in feet</text>
+    <rect x="910" y="362" width="250" height="62" rx="12" fill="#fff" stroke="#c9d5dd" stroke-width="1.5"/>
+    <text x="928" y="390" font-size="16" font-weight="800" fill="#0b3349">National Weather Service</text><text x="928" y="412" class="s">live alerts, 7-day forecast</text>
+  </g>
+  <text x="910" y="470" class="h">AI</text>
+  <rect x="910" y="482" width="250" height="78" rx="12" fill="#def0f2" stroke="#0e7486" stroke-width="1.5"/>
+  <text x="928" y="512" font-size="16" font-weight="800" fill="#0b3349">Google Gemini</text>
+  <text x="928" y="536" class="s">+ Google Search grounding</text>
+
+  <!-- arrows -->
+  <path class="ln" d="M290 195 H366"/>
+  <path class="ln" d="M290 325 H330 V200 H366"/>
+  <path class="ln" d="M605 562 V608"/>
+  <path class="ln" d="M842 171 H906"/>
+  <path class="ln" d="M842 280 H880 V245 H906"/>
+  <path class="ln" d="M842 300 H880 V319 H906"/>
+  <path class="ln" d="M842 320 H870 V393 H906"/>
+  <path class="ln" d="M842 400 H860 V521 H906"/>
+</svg>

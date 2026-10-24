@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tideline</title>
+  <meta name="description" content="Get your home and family ready for El Niño storms: your flood risk, a personal checklist in your language, and help nearby.">
+  <meta name="theme-color" content="#0b3349">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ ONBOARDING ============ -->
+  <section id="onboard" class="onboard" hidden>
+    <div class="ob-step" data-step="1">
+      <div class="ob-hero">
+        <div class="ob-wave" aria-hidden="true"></div>
+        <p class="ob-brand"><span class="logo" aria-hidden="true"></span><span class="app-name">Tideline</span></p>
+        <h1>A strong El Niño is coming. Let’s get your home ready.</h1>
+        <p class="ob-lead">In about a minute, see your home’s storm risk, get a checklist made for your family, in your language, and find help nearby.</p>
+      </div>
+      <div class="ob-body">
+        <div class="ob-facts" id="obFacts"></div>
+        <label class="field-label" for="langSelect">Language for your plan</label>
+        <select id="langSelect"></select>
+        <button class="btn btn-primary btn-wide" type="button" id="obStart">Get started</button>
+        <p class="fineprint center">No account needed. Your plan is linked to this device only.</p>
+      </div>
+    </div>
+
+    <div class="ob-step" data-step="2" hidden>
+      <div class="ob-top"><button class="back-link" type="button" data-ob-back="1">← Back</button><span class="ob-count">Step 1 of 2</span></div>
+      <h2>Where do you live?</h2>
+      <p class="muted">We check the official flood map, ground height and live weather alerts for this exact spot.</p>
+      <form id="addrForm" autocomplete="on">
+        <label class="field-label" for="addrInput">Home address</label>
+        <input id="addrInput" type="text" placeholder="e.g. 100 Murchison Dr, Millbrae, CA" autocomplete="street-address" required>
+        <button class="btn btn-primary btn-wide" type="submit">Continue</button>
+      </form>
+      <div class="or"><span>or</span></div>
+      <button class="btn btn-ghost btn-wide" type="button" id="useLocation"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg>Use my current location</button>
+      <label class="field-label" for="labelInput" style="margin-top:22px">Name this place <span class="opt">optional</span></label>
+      <input id="labelInput" type="text" placeholder="Home" maxlength="40">
+      <p class="fineprint">Making a plan for a grandparent or a relative? Use their address and name it, like “Grandma’s house.”</p>
+    </div>
+
+    <div class="ob-step" data-step="3" hidden>
+      <div class="ob-top"><button class="back-link" type="button" data-ob-back="2">← Back</button><span class="ob-count">Step 2 of 2</span></div>
+      <h2>Who lives here?</h2>
+      <p class="muted">Pick everything that fits. It changes what goes on your checklist. Nothing here is shared.</p>
+      <div class="chips-pick" id="householdPick"></div>
+      <button class="btn btn-primary btn-wide" type="button" id="buildPlan">Build my plan</button>
+    </div>
+
+    <div class="ob-step" data-step="4" hidden>
+      <div class="building">
+        <div class="building-wave" aria-hidden="true"><span></span><span></span><span></span></div>
+        <h2>Building your plan</h2>
+        <ol class="build-steps" id="buildSteps"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APP ============ -->
+  <header class="topbar" id="topbar" hidden>
+    <button class="place-btn" type="button" id="placeBtn" aria-label="Switch place">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg>
+      <span id="placeName">Home</span>
+      <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <span class="wordmark"><span class="logo" aria-hidden="true"></span><span class="app-name">Tideline</span></span>
+    <button class="icon-btn" type="button" id="refreshBtn" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+  </header>
+
+  <main id="main" hidden>
+    <section id="view-plan" class="view active" aria-label="My plan"><div class="page" id="planPage"></div></section>
+    <section id="view-list" class="view" aria-label="Checklist"><div class="page" id="listPage"></div></section>
+    <section id="view-map" class="view view-map" aria-label="Map">
+      <div id="map"></div>
+      <div class="map-card" id="mapCard"></div>
+      <button class="fab" type="button" id="reportFab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Report a problem</button>
+    </section>
+    <section id="view-help" class="view" aria-label="Help nearby"><div class="page" id="helpPage"></div></section>
+    <section id="view-news" class="view" aria-label="News"><div class="page" id="newsPage"></div></section>
+  </main>
+
+  <nav class="tabbar" id="tabbar" aria-label="Main" hidden>
+    <button class="tab active" data-view="plan" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7z"/></svg><span>My plan</span></button>
+    <button class="tab" data-view="list" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg><span>Checklist</span></button>
+    <button class="tab" data-view="map" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg><span>Map</span></button>
+    <button class="tab" data-view="help" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/></svg><span>Help</span></button>
+    <button class="tab" data-view="news" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a2 2 0 0 1 2 2v13a1 1 0 0 0 2 0V8"/><path d="M5 4v14a2 2 0 0 0 2 2h13"/><path d="M8 8h6M8 12h6M8 16h3"/></svg><span>News</span></button>
+  </nav>
+</div>
+
+<!-- bottom sheet -->
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-backdrop" data-close></div>
+  <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <button class="sheet-x" type="button" data-close aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="config.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="app.js"></script>
+</body>
+</html>

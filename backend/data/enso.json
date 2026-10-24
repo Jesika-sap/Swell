@@ -1,0 +1,13 @@
+{
+  "updated": "2026-10-21",
+  "status": "Strong El Niño likely this winter",
+  "detail": "NOAA's October 8, 2026 outlook gives a greater than 83% chance of a strong to very strong El Niño through January to March 2027.",
+  "events": [
+    {"date": "2026-09-21", "text": "Governor Newsom declared a state of emergency for storms expected to be of historic severity.", "source": "Stanford Daily", "url": "https://stanforddaily.com/2026/09/23/el-nino-heavy-rain-flooding-bay-area/"},
+    {"date": "2026-10-20", "text": "San Mateo County declared a local El Niño emergency and formed a preparedness task force.", "source": "San Mateo County", "url": "https://www.smcgov.org/ceo/news/county-prepares-winter-storms-urges-residents-do-same"}
+  ],
+  "sources": [
+    {"title": "San Mateo County: County prepares for winter storms", "url": "https://www.smcgov.org/ceo/news/county-prepares-winter-storms-urges-residents-do-same"},
+    {"title": "NOAA Climate Prediction Center: ENSO diagnostic discussion", "url": "https://www.cpc.ncep.noaa.gov/products/analysis_monitoring/enso_advisory/ensodisc.shtml"}
+  ]
+}

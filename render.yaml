@@ -1,0 +1,25 @@
+# Render "Blueprint": one click creates the database and the web server.
+# The Gemini key is entered in the Render dashboard (never committed to git).
+databases:
+  - name: tideline-db
+    plan: free
+    databaseName: tideline
+    user: tideline
+
+services:
+  - type: web
+    name: tideline
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && gunicorn app:app --workers 2 --threads 4 --timeout 60 --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tideline-db
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.7

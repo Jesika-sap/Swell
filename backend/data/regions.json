@@ -1,0 +1,16 @@
+{
+  "note": "Typical El Niño effects. Every El Niño is different, so these are tendencies, not guarantees.",
+  "source": {"title": "NOAA Climate.gov: ENSO", "url": "https://www.climate.gov/enso"},
+  "regions": [
+    {"id": "california", "name": "California", "season": "December to March", "effect": "wetter", "impact": "More and stronger storms and atmospheric rivers, flooding, coastal erosion, king tide flooding and landslides.", "prepare": "Know your flood risk, get sandbags early, clear drains and plan for power outages."},
+    {"id": "pacific-northwest", "name": "Pacific Northwest (U.S.)", "season": "December to March", "effect": "warmer and drier", "impact": "A milder winter with less snowpack, which can mean water shortages and wildfire risk the next summer.", "prepare": "Conserve water and watch for drought notices."},
+    {"id": "us-south", "name": "Southern U.S. and Gulf Coast", "season": "December to March", "effect": "wetter and cooler", "impact": "More winter rain and flooding across the Southeast and Gulf Coast.", "prepare": "Check flood zones and keep storm drains clear."},
+    {"id": "peru-ecuador", "name": "Peru and Ecuador", "season": "January to April", "effect": "much wetter", "impact": "Heavy coastal rain, river flooding and mudslides. Warmer ocean water hurts fishing.", "prepare": "Make a family emergency plan and know where to evacuate."},
+    {"id": "south-asia", "name": "South Asia (Nepal, India, Bangladesh)", "season": "June to September monsoon", "effect": "drier", "impact": "El Niño years often bring a weaker or delayed monsoon, which means drought, heat and lost crops for farming families.", "prepare": "Save water, plan for heat, and ask local farm offices about drought-tolerant seed."},
+    {"id": "indonesia-australia", "name": "Indonesia and Australia", "season": "June to November", "effect": "drier", "impact": "Drought, wildfires and smoke haze.", "prepare": "Prepare for wildfire smoke and water limits."},
+    {"id": "southern-africa", "name": "Southern Africa", "season": "December to March", "effect": "drier", "impact": "Drought and food shortages.", "prepare": "Follow local drought and food-security programs."},
+    {"id": "east-africa", "name": "East Africa", "season": "October to December", "effect": "wetter", "impact": "Heavier short rains and flooding.", "prepare": "Know flood-safe routes and higher ground."},
+    {"id": "central-america", "name": "Central America", "season": "June to August", "effect": "drier", "impact": "Drought in the Dry Corridor, with crop losses.", "prepare": "Plan water storage and watch crop advisories."},
+    {"id": "southern-south-america", "name": "Southern Brazil, Uruguay and Argentina", "season": "October to December", "effect": "wetter", "impact": "Heavy rain and river flooding.", "prepare": "Watch river flood warnings."}
+  ]
+}

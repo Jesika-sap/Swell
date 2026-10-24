@@ -1,0 +1,205 @@
+"""Run with:  cd backend && python -m unittest discover tests -v"""
+import os
+import sys
+import tempfile
+import unittest
+from datetime import date
+
+HERE = os.path.dirname(__file__)
+sys.path.insert(0, os.path.join(HERE, ".."))
+os.environ["SQLITE_PATH"] = os.path.join(tempfile.mkdtemp(), "test.db")
+os.environ["GEMINI_API_KEY"] = "test-key"
+
+import config  # noqa: E402
+import db  # noqa: E402
+from services import http, risk, checklist, flood  # noqa: E402
+from tests import fakes  # noqa: E402
+
+http.fake = fakes.fake
+import app as server  # noqa: E402
+
+DEV = {"X-Device-Id": "test-device-0001"}
+OTHER = {"X-Device-Id": "someone-else-0002"}
+TIDES = server.TIDES
+
+
+class RiskScoreTests(unittest.TestCase):
+    def test_bayfront_home_is_high(self):
+        r = risk.score(flood={"level": "high", "zone": "AE", "text": "High-risk flood zone", "source": "FEMA"},
+                       elevation=6.2, alerts=[{"event": "Coastal Flood Warning", "kind": "warning", "storm_related": True}],
+                       rain={"peak_chance": 90, "summary": "Rain likely"}, county="San Mateo", state="CA",
+                       tides=TIDES, today=date(2026, 11, 1))
+        self.assertEqual(r["level"], "high")
+        self.assertEqual(r["score"], 100)  # capped
+        self.assertEqual(r["factors"][0]["key"], "flood_zone")
+        self.assertEqual(r["king_tides"][0]["start"], "2026-11-21")
+
+    def test_hillside_home_without_data_is_lower(self):
+        r = risk.score(flood={"level": "minimal", "zone": "X", "text": "Outside", "source": "FEMA"}, elevation=180,
+                       alerts=[], rain={"peak_chance": 10, "summary": "dry"}, county="San Mateo", state="CA", tides=TIDES)
+        self.assertEqual(r["level"], "lower")
+        self.assertEqual(r["score"], 5)  # only the El Nino baseline
+
+    def test_past_king_tides_are_dropped(self):
+        w = risk.king_tide_windows(TIDES, date(2026, 12, 30))
+        self.assertEqual([x["start"] for x in w], ["2027-01-17"])
+        self.assertTrue(risk.king_tide_windows(TIDES, date(2027, 1, 20))[0]["active"])
+
+    def test_fema_zone_wording(self):
+        self.assertEqual(flood.describe_zone("VE", None, "T")[0], "high")
+        self.assertEqual(flood.describe_zone("X", "0.2 PCT ANNUAL CHANCE FLOOD HAZARD", "F")[0], "moderate")
+        self.assertEqual(flood.describe_zone("X", "AREA OF MINIMAL FLOOD HAZARD", "F")[0], "minimal")
+
+
+class ChecklistTests(unittest.TestCase):
+    def test_household_needs_add_tasks(self):
+        r = {"level": "high", "score": 80, "factors": [{"key": "flood_zone", "points": 40, "detail": ""}]}
+        items = checklist.build(r, {"older_adult": True, "no_car": True, "pets": True, "medical_device": True},
+                                county="San Mateo", alert_system={"name": "SMC Alert", "url": "u"},
+                                nearest_sandbags={"name": "San Mateo Corporation Yard"})
+        ids = [i["id"] for i in items]
+        for must in ("alerts", "sandbags", "flood_insurance", "extra_help", "ride", "pets", "medical_power", "turn_around"):
+            self.assertIn(must, ids)
+        self.assertIn("SMC Alert", items[0]["title"])
+        self.assertIn("San Mateo Corporation Yard", next(i for i in items if i["id"] == "sandbags")["why"])
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_low_risk_household_still_gets_basics(self):
+        r = {"level": "lower", "score": 5, "factors": [{"key": "el_nino", "points": 5, "detail": ""}]}
+        ids = [i["id"] for i in checklist.build(r, {})]
+        self.assertNotIn("sandbags", ids)
+        for must in ("alerts", "family_plan", "water", "go_bag", "turn_around"):
+            self.assertIn(must, ids)
+
+
+class ApiTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.c = server.app.test_client()
+
+    def setUp(self):
+        fakes.FAIL.clear()
+        fakes.GEMINI_MODE["plan"] = "ok"
+        config.GEMINI_API_KEY = "test-key"
+
+    def plan(self, **kw):
+        body = {"address": "1 Main St, Foster City, CA", "language": "en", "household": {"older_adult": True}}
+        body.update(kw)
+        return self.c.post("/api/plan", json=body, headers=DEV)
+
+    def test_health(self):
+        self.assertTrue(self.c.get("/api/health").get_json()["ok"])
+
+    def test_bayfront_plan_end_to_end(self):
+        res = self.plan()
+        self.assertEqual(res.status_code, 201, res.get_json())
+        p = res.get_json()
+        self.assertEqual(p["place"]["county"], "San Mateo")
+        self.assertEqual(p["risk"]["level"], "high")
+        self.assertEqual(p["alerts"][0]["event"], "Coastal Flood Warning")
+        self.assertEqual(p["help"]["alert_system"]["name"], "SMC Alert")
+        self.assertEqual(p["help"]["sandbags"][0]["name"], "San Mateo Corporation Yard")  # closest to Foster City in the fake map
+        self.assertLess(p["help"]["sandbags"][0]["miles"], p["help"]["sandbags"][1]["miles"])
+        self.assertIn("extra_help", [i["id"] for i in p["checklist"]])
+        self.assertEqual(p["missing"], [])
+        self.assertTrue(p["summary"])
+
+    def test_spanish_plan(self):
+        p = self.plan(language="es").get_json()
+        self.assertTrue(p["translated"])
+        self.assertTrue(p["checklist"][0]["title"].startswith("ES: "))
+        self.assertIn("arena", p["summary"])
+
+    def test_ai_that_drops_a_task_is_rejected(self):
+        fakes.GEMINI_MODE["plan"] = "drop"
+        p = self.plan(language="es").get_json()
+        self.assertFalse(p["translated"])
+        self.assertIn("ai", p["missing"])
+        self.assertFalse(p["checklist"][0]["title"].startswith("ES: "))
+
+    def test_plan_survives_outages(self):
+        fakes.FAIL.update({"hazards.fema.gov", "epqs.nationalmap.gov", "api.weather.gov"})
+        fakes.GEMINI_MODE["plan"] = "down"
+        res = self.plan(address="100 Murchison Dr, Millbrae, CA")
+        self.assertEqual(res.status_code, 201)
+        p = res.get_json()
+        self.assertEqual(set(p["missing"]) >= {"flood", "elevation", "alerts", "forecast", "ai"}, True)
+        self.assertTrue(len(p["checklist"]) > 10)
+        self.assertTrue(p["summary"])
+
+    def test_no_ai_key(self):
+        config.GEMINI_API_KEY = ""
+        p = self.plan(language="es").get_json()
+        self.assertFalse(p["translated"])
+        self.assertTrue(p["summary"])
+
+    def test_use_my_location(self):
+        res = self.c.post("/api/plan", json={"lat": 37.5985, "lon": -122.3872}, headers=DEV)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.get_json()["place"]["city"], "Millbrae")
+
+    def test_bad_inputs(self):
+        self.assertEqual(self.c.post("/api/plan", json={"address": "x"}).status_code, 400)  # no device id
+        self.assertEqual(self.c.post("/api/plan", json={"address": "nowhere at all"}, headers=DEV).status_code, 400)
+        self.assertEqual(self.c.post("/api/plan", json={"lat": 999, "lon": 0}, headers=DEV).status_code, 400)
+        self.assertEqual(self.c.post("/api/plan", data="hi", headers=DEV).status_code, 400)
+
+    def test_checklist_progress_and_privacy(self):
+        p = self.plan().get_json()
+        pid = p["id"]
+        self.assertEqual(self.c.post(f"/api/plan/{pid}/check", json={"item_id": "water", "done": True}, headers=DEV).get_json()["done"], 1)
+        self.c.post(f"/api/plan/{pid}/check", json={"item_id": "water", "done": True}, headers=DEV)
+        again = self.c.get(f"/api/plan/{pid}", headers=DEV).get_json()
+        self.assertEqual(again["progress"]["done"], 1)
+        self.assertTrue(next(i for i in again["checklist"] if i["id"] == "water")["done"])
+        self.assertEqual(self.c.get(f"/api/plan/{pid}", headers=OTHER).status_code, 404)  # other people can't see it
+        self.assertIn(pid, [x["id"] for x in self.c.get("/api/plans", headers=DEV).get_json()])
+        self.assertEqual(self.c.delete(f"/api/plan/{pid}", headers=DEV).status_code, 200)
+        self.assertEqual(self.c.get(f"/api/plan/{pid}", headers=DEV).status_code, 404)
+
+    def test_ai_help_outside_checked_counties(self):
+        p = self.plan(address="915 I St, Sacramento, CA").get_json()
+        self.assertEqual(p["help"]["sandbags"], [])
+        self.assertEqual(p["help"]["ai"]["sites"][0]["verified"], False)
+        self.assertEqual(p["help"]["ai"]["sources"][0]["title"], "cityofsacramento.gov")
+
+    def test_news_with_sources(self):
+        n = self.c.get("/api/news?county=San%20Mateo&state=CA").get_json()
+        self.assertTrue(n["ai"])
+        self.assertIn("emergency", n["headline"])
+        self.assertEqual(len(n["sources"]), 2)
+        self.assertIn("detail", n["enso"])
+
+    def test_reports_flow(self):
+        photo = "data:image/jpeg;base64," + "A" * 400
+        a = self.c.post("/api/reports/analyze", json={"photo": photo}, headers=DEV).get_json()
+        self.assertEqual(a["kind"], "drain")
+        res = self.c.post("/api/reports", json={"lat": 37.59, "lon": -122.38, "kind": a["kind"], "title": a["title"],
+                                                "severity": a["severity"], "photo": photo, "ai_checked": True}, headers=DEV)
+        self.assertEqual(res.status_code, 201)
+        rid = res.get_json()["id"]
+        near = self.c.get("/api/reports?lat=37.6&lon=-122.39").get_json()
+        self.assertIn(rid, [r["id"] for r in near])
+        self.assertNotIn("photo", near[0])
+        far = self.c.get("/api/reports?lat=34.05&lon=-118.24").get_json()
+        self.assertNotIn(rid, [r["id"] for r in far])
+        self.assertEqual(self.c.post(f"/api/reports/{rid}/confirm", headers=OTHER).get_json()["confirmations"], 1)
+        self.assertEqual(self.c.post(f"/api/reports/{rid}/confirm", headers=OTHER).get_json()["confirmations"], 1)  # once per device
+        self.assertTrue(self.c.get(f"/api/reports/{rid}/photo").get_json()["photo"].startswith("data:image/jpeg"))
+        bad = self.c.post("/api/reports", json={"lat": 37.59, "lon": -122.38, "photo": "data:text/html,hi"}, headers=DEV)
+        self.assertEqual(bad.status_code, 400)
+
+    def test_cache_avoids_repeat_calls(self):
+        self.plan(address="2 Main St, Foster City, CA")
+        before = len([c for c in fakes.CALLS if "hazards.fema.gov" in c[1]])
+        self.plan(address="2 Main St, Foster City, CA")
+        after = len([c for c in fakes.CALLS if "hazards.fema.gov" in c[1]])
+        self.assertEqual(before, after)
+
+    def test_regions_and_enso(self):
+        regions = self.c.get("/api/regions").get_json()["regions"]
+        self.assertIn("south-asia", [r["id"] for r in regions])
+
+
+if __name__ == "__main__":
+    unittest.main()
