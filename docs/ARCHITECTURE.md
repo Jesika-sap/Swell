@@ -198,5 +198,5 @@ python -m unittest discover tests -v
 - **Oct 23, 2026:** Python API, database, risk engine, checklist rules, AI translation with guardrail, help finder, news, neighbor reports, web app, and 20 tests.
 - **Oct 23, 2026:** Renamed to Swell. Added the farmer role, drought plans for South Asia and other El Niño regions, AI Scan, organizations and help requests. 26 tests.
 - **Oct 23, 2026:** Stronger AI Scan: Gemini Pro first, an inspector's checklist for flood or drought and home or farm, up to 8 findings with where, why, fix and effort, low-confidence findings dropped, plus what's already done right and one more photo to take.
-- **Oct 24, 2026:** Accounts (scrypt-hashed passwords), communities (county, city, private family groups of 5 with "I'm safe"), the Community tab replaced the map, worldwide facts on the welcome screen, and a start script that checks the Gemini key. 27 tests.
+- **Oct 24, 2026:** Accounts (scrypt-hashed passwords), communities (county, city, private family groups of 5 with "I'm safe"), a new Community tab next to the Map (each community has its own map), worldwide facts on the welcome screen, and a start script that checks the Gemini key. 27 tests.
 - **Oct 23, 2026:** iPhone app caught up with the web app: home or farm, farm details, AI Scan, region card, ask for help, and the organization dashboard.

@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import MapKit
 
 /// Communities: your county, your city, and private family groups (up to 5 people).
 /// Inside one you see storm reports from that area. You need an account to join.
@@ -161,6 +162,11 @@ struct CommunityDetailView: View {
     var body: some View {
         List {
             if let d = detail {
+                Section {
+                    CommunityMap(detail: d, home: store.plan) { selected = $0 }
+                        .frame(height: 230)
+                        .listRowInsets(EdgeInsets())
+                }
                 if d.kind == "family" { familySection(d) }
                 Section {
                     if d.reports.isEmpty {
@@ -385,6 +391,52 @@ struct JoinCodeSheet: View {
             .navigationTitle("Join a family group")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        }
+    }
+}
+
+
+/// A map of just this community: its storm reports, plus your family's places for family groups.
+struct CommunityMap: View {
+    let detail: CommunityDetail
+    let home: Plan?
+    let onSelect: (StormReport) -> Void
+
+    private var region: MKCoordinateRegion {
+        var pts: [CLLocationCoordinate2D] = detail.reports.map { .init(latitude: $0.lat, longitude: $0.lon) }
+        pts += (detail.places ?? []).map { .init(latitude: $0.lat, longitude: $0.lon) }
+        if let c = detail.center { pts.append(.init(latitude: c.lat, longitude: c.lon)) }
+        if pts.isEmpty, let home { pts.append(.init(latitude: home.lat, longitude: home.lon)) }
+        guard let first = pts.first else {
+            return MKCoordinateRegion(center: .init(latitude: 37.56, longitude: -122.32), latitudinalMeters: 20000, longitudinalMeters: 20000)
+        }
+        let lats = pts.map(\.latitude), lons = pts.map(\.longitude)
+        let minSpan = detail.kind == "county" ? 0.35 : 0.04
+        let span = MKCoordinateSpan(latitudeDelta: max((lats.max()! - lats.min()!) * 1.5, minSpan),
+                                    longitudeDelta: max((lons.max()! - lons.min()!) * 1.5, minSpan))
+        let center = pts.count == 1 ? first : .init(latitude: (lats.max()! + lats.min()!) / 2, longitude: (lons.max()! + lons.min()!) / 2)
+        return MKCoordinateRegion(center: center, span: span)
+    }
+
+    var body: some View {
+        Map(initialPosition: .region(region)) {
+            ForEach(detail.places ?? []) { p in
+                Marker("\(p.who): \(p.label)", systemImage: "house.fill", coordinate: .init(latitude: p.lat, longitude: p.lon))
+                    .tint(Theme.ocean)
+            }
+            if detail.kind != "family", let home {
+                Marker(home.label ?? "Home", systemImage: "house.fill", coordinate: .init(latitude: home.lat, longitude: home.lon))
+                    .tint(Theme.ocean)
+            }
+            ForEach(detail.reports) { r in
+                Annotation(r.title, coordinate: .init(latitude: r.lat, longitude: r.lon)) {
+                    Button { onSelect(r) } label: {
+                        Image(systemName: "drop.fill").foregroundStyle(.white).padding(7)
+                            .background(r.severity >= 3 ? Color.red : r.severity == 2 ? Color.orange : Theme.sea, in: Circle())
+                            .overlay(Circle().stroke(.white, lineWidth: 2))
+                    }
+                }
+            }
         }
     }
 }

@@ -246,7 +246,7 @@ def plan_payload(plan_id, live=None, help_=None, missing=None, translated=False)
     for i in items:
         i["done"] = i["id"] in done
     hh = json.loads(row["household"])
-    place = {"county": row["county"], "city": row["city"], "state": row["state"], "country": hh.get("country", "US")}
+    place = {"county": row["county"], "city": geocode.clean_city(row["city"]), "state": row["state"], "country": hh.get("country", "US")}
     if live is None and place["country"] != "US":
         live, missing = {"alerts": [], "forecast": [], "rain": None}, []
     if live is None:  # reopening a saved plan: refresh only the fast-changing parts
@@ -279,6 +279,8 @@ def plan_payload(plan_id, live=None, help_=None, missing=None, translated=False)
 def list_plans():
     device = need_device()
     rows = db.query("SELECT id, label, address, city, state, risk, created_at FROM plans WHERE device_id = ? ORDER BY created_at DESC", (device,))
+    for r in rows:
+        r["city"] = geocode.clean_city(r["city"])
     return jsonify([{**{k: r[k] for k in ("id", "label", "address", "city", "state", "created_at")},
                      "level": json.loads(r["risk"])["level"], "score": json.loads(r["risk"])["score"]} for r in rows])
 
@@ -750,9 +752,10 @@ def _place_communities(device):
             k = f"county:{region}:{p['county']}"
             out.setdefault(k, {"key": k, "kind": "county", "name": f"{p['county']} County" if region and len(region) == 2 else p["county"],
                                "county": p["county"], "lat": p["lat"], "lon": p["lon"]})
-        if p["city"]:
-            k = f"city:{region}:{p['city']}"
-            out.setdefault(k, {"key": k, "kind": "city", "name": p["city"], "county": p["county"], "lat": p["lat"], "lon": p["lon"]})
+        city = geocode.clean_city(p["city"])
+        if city:
+            k = f"city:{region}:{city}"
+            out.setdefault(k, {"key": k, "kind": "city", "name": city, "county": p["county"], "lat": p["lat"], "lon": p["lon"]})
     return out
 
 
@@ -781,7 +784,8 @@ def _community_reports(c, member_places=None):
 
 def _community_summary(c, account_id):
     n = db.one("SELECT COUNT(*) AS n FROM community_members WHERE community_id = ?", (c["id"],))["n"]
-    return {"id": c["id"], "kind": c["kind"], "name": c["name"], "members": n,
+    name = geocode.clean_city(c["name"]) if c["kind"] == "city" else c["name"]
+    return {"id": c["id"], "kind": c["kind"], "name": name, "members": n,
             "max_members": FAMILY_MAX if c["kind"] == "family" else None,
             "owner": c["owner_id"] == account_id}
 
@@ -800,7 +804,11 @@ def list_communities():
         rows = db.query("""SELECT c.* FROM communities c JOIN community_members m ON m.community_id = c.id
                            WHERE m.account_id = ? ORDER BY c.kind, c.name""", (a["id"],))
         mine = [_community_summary(c, a["id"]) for c in rows]
-        joined_keys = {c["place_key"] for c in rows if c["place_key"]}
+        joined_keys = set()
+        for c in rows:
+            if c["place_key"]:
+                kind, region, name = (c["place_key"].split(":", 2) + ["", ""])[:3]
+                joined_keys |= {c["place_key"], f"{kind}:{region}:{geocode.clean_city(name) if kind == 'city' else name}"}
     suggested = [{"key": s["key"], "kind": s["kind"], "name": s["name"]}
                  for s in _place_communities(g.device).values() if s["key"] not in joined_keys]
     return jsonify({"account": account_public(a), "mine": mine, "suggested": suggested, "family_max": FAMILY_MAX})
@@ -876,11 +884,16 @@ def get_community(cid):
                 total = len(json.loads(db.one("SELECT checklist FROM plans WHERE id = ?", (p["id"],))["checklist"]))
                 done = db.one("SELECT COUNT(*) AS n FROM checklist_done WHERE plan_id = ?", (p["id"],))["n"]
                 r = json.loads(p["risk"])
-                places.append({"label": p["label"], "city": p["city"], "level": r["level"], "score": r["score"],
+                places.append({"label": p["label"], "city": geocode.clean_city(p["city"]), "level": r["level"], "score": r["score"],
                                "done": min(done, total), "total": total})
                 member_places.append(p)
+                # Family sees roughly where each place is (about 1 km), never the exact address.
+                out.setdefault("places", []).append({"who": m["name"], "label": p["label"] or "Home",
+                                                     "lat": round(p["lat"], 2), "lon": round(p["lon"], 2)})
             people.append({"name": m["name"], "role": m["role"], "you": m["id"] == a["id"], "safe_at": m["safe_at"], "places": places})
         out["people"] = people
+    else:
+        out["center"] = {"lat": c["lat"], "lon": c["lon"]}
     out["reports"] = _community_reports(c, member_places)
     return jsonify(out)
 

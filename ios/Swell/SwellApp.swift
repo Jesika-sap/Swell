@@ -137,8 +137,8 @@ struct MainTabs: View {
         TabView {
             NavigationStack { PlanView() }
                 .tabItem { Label("My plan", systemImage: "shield.lefthalf.filled") }
-            NavigationStack { ChecklistView() }
-                .tabItem { Label("Checklist", systemImage: "checklist") }
+            NavigationStack { MapScreen() }
+                .tabItem { Label("Map", systemImage: "map") }
             NavigationStack { CommunityView() }
                 .tabItem { Label("Community", systemImage: "person.3") }
             NavigationStack { HelpView() }

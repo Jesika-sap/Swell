@@ -18,13 +18,25 @@ def _clean_county(name):
     return (name or "").replace(" County", "").strip() or None
 
 
+_SUFFIXES = (" city and borough", " city", " town", " village", " borough", " CCD", " CDP", " municipality")
+
+
+def clean_city(name):
+    """The Census calls places "San Bruno city" or "Half Moon Bay CCD". People just say "San Bruno"."""
+    name = (name or "").strip()
+    for s in _SUFFIXES:
+        if name.endswith(s):
+            return name[: -len(s)].strip() or None
+    return name or None
+
+
 def _from_census_geo(geos):
     counties = geos.get("Counties") or []
     places = geos.get("Incorporated Places") or geos.get("County Subdivisions") or []
     states = geos.get("States") or []
     return {
         "county": _clean_county(counties[0]["NAME"]) if counties else None,
-        "city": places[0]["NAME"] if places else None,
+        "city": clean_city(places[0].get("BASENAME") or places[0]["NAME"]) if places else None,
         "state": states[0].get("STUSAB") if states else None,
     }
 

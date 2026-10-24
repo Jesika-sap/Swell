@@ -182,6 +182,7 @@ function setPlan(p) {
 }
 function renderAll() {
   renderPlan(); renderList(); renderHelp();
+  if (currentView === 'map') renderMap();
   if (currentView === 'community') renderCommunity();
   if (currentView === 'news') renderNews();
 }
@@ -606,6 +607,36 @@ function openLogout() {
   });
 }
 
+/* ---------------- map ---------------- */
+let map = null, layer = null;
+function pinIcon(cls, svg) {
+  return L.divIcon({ className: '', html: `<div class="pin ${cls}"><svg viewBox="0 0 24 24">${svg}</svg></div>`, iconSize: [30, 30], iconAnchor: [15, 30] });
+}
+function reportPins(lyr, reports) {
+  reports.forEach((r) => L.marker([r.lat, r.lon], { icon: pinIcon('pin-r' + r.severity, ICON.drop) }).addTo(lyr).on('click', () => openReport(r)));
+}
+async function renderMap() {
+  if (!plan || typeof L === 'undefined') return;
+  if (!map) {
+    map = L.map('map', { zoomControl: false }).setView([plan.lat, plan.lon], 14);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+  } else {
+    map.invalidateSize();
+  }
+  layer.clearLayers();
+  L.marker([plan.lat, plan.lon], { icon: pinIcon('pin-home', ICON.home) }).addTo(layer).bindPopup(`<b>${esc(plan.label)}</b>`);
+  (plan.help.sandbags || []).forEach((s) => L.marker([s.lat, s.lon], { icon: pinIcon('pin-bag', ICON.bag) }).addTo(layer)
+    .bindPopup(`<b>Sandbags: ${esc(s.name)}</b><br>${esc(s.address)}<br><a href="${mapsLink(s.address)}" target="_blank" rel="noopener">Directions</a>`));
+  $('#mapCard').innerHTML = `<span><i style="background:var(--ocean)"></i>Your place</span><span><i style="background:#b86a00"></i>Sandbags</span><span><i style="background:#c0392b"></i>Storm reports</span>`;
+  let reports = [];
+  try { reports = await api(`/api/reports?lat=${plan.lat}&lon=${plan.lon}&miles=10`); } catch (e) { reports = []; }
+  reportPins(layer, reports);
+  setTimeout(() => map.invalidateSize(), 50);
+}
+$('#reportFab').addEventListener('click', () => openReportForm(() => renderMap(), map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : null));
+
 /* ---------------- communities ---------------- */
 const KINDS = { flooding: 'Flooded street', drain: 'Clogged storm drain', landslide: 'Landslide or mudslide', tree: 'Fallen tree', power: 'Downed power line', road: 'Road damage', other: 'Other storm problem' };
 const COMM_KIND = { county: 'County', city: 'City', family: 'Private family group' };
@@ -698,6 +729,7 @@ async function renderCommunityDetail(id) {
     <button class="back-link" type="button" id="commBack">← All communities</button>
     <div class="comm-head"><span class="comm-ic big k-${c.kind}"><svg viewBox="0 0 24 24" aria-hidden="true">${COMM_ICON[c.kind]}</svg></span>
       <div><h2 style="margin:0">${esc(c.name)}</h2><p class="muted small" style="margin:2px 0 0">${COMM_KIND[c.kind]} · ${c.members}${fam ? ` of ${c.max_members}` : ''} ${c.members === 1 ? 'member' : 'members'}</p></div></div>
+    <div class="comm-map" id="commMap" role="img" aria-label="Map of storm reports in ${esc(c.name)}"></div>
     ${fam ? `<section class="card block">
       <div class="section-head"><h3>Members</h3></div>
       <ul class="people">${c.people.map((p) => `<li><span class="avatar">${esc(p.name.slice(0, 1).toUpperCase())}</span><div>
@@ -717,6 +749,7 @@ async function renderCommunityDetail(id) {
       : `<div class="notice">No storm reports ${fam ? 'near your family’s places' : 'here'} right now. If you see flooding, a clogged drain or a fallen tree, report it so ${fam ? 'your family knows' : 'your neighbors know'}.</div>`}
     </section>
     <button class="link-btn danger" type="button" id="leaveBtn">Leave this ${fam ? 'group' : 'community'}</button>`;
+  drawCommunityMap(c);
   $('#commBack').addEventListener('click', () => { commOpen = null; renderCommunity(); });
   $('#reportHere').addEventListener('click', () => openReportForm(() => renderCommunity()));
   $$('[data-rep]', page).forEach((b) => b.addEventListener('click', () => openReport(c.reports.find((r) => r.id === b.dataset.rep))));
@@ -730,6 +763,24 @@ async function renderCommunityDetail(id) {
     const cp = $('#copyCode');
     if (cp) cp.addEventListener('click', () => { try { navigator.clipboard.writeText(c.invite_code); toast('Code copied.'); } catch (e) { toast(c.invite_code); } });
   }
+}
+let commMap = null;
+function drawCommunityMap(c) {
+  if (typeof L === 'undefined' || !$('#commMap')) return;
+  if (commMap) { commMap.remove(); commMap = null; }
+  commMap = L.map('commMap', { zoomControl: false, attributionControl: true, scrollWheelZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(commMap);
+  const lyr = L.layerGroup().addTo(commMap);
+  const pts = [];
+  (c.places || []).forEach((p) => { L.marker([p.lat, p.lon], { icon: pinIcon('pin-home', ICON.home) }).addTo(lyr).bindPopup(`<b>${esc(p.who)}</b><br>${esc(p.label)}`); pts.push([p.lat, p.lon]); });
+  if (!pts.length && plan) { L.marker([plan.lat, plan.lon], { icon: pinIcon('pin-home', ICON.home) }).addTo(lyr).bindPopup(`<b>${esc(plan.label)}</b>`); pts.push([plan.lat, plan.lon]); }
+  reportPins(lyr, c.reports);
+  c.reports.forEach((r) => pts.push([r.lat, r.lon]));
+  const zoom = c.kind === 'county' ? 10 : c.kind === 'city' ? 13 : 13;
+  if (c.center) pts.push([c.center.lat, c.center.lon]);
+  if (pts.length > 1) commMap.fitBounds(pts, { padding: [30, 30], maxZoom: 15 });
+  else commMap.setView(pts[0] || [c.center.lat, c.center.lon], zoom);
+  setTimeout(() => commMap && commMap.invalidateSize(), 60);
 }
 async function openReport(r) {
   openSheet(`<h2 id="sheetTitle">${esc(r.title)}</h2>
@@ -767,13 +818,13 @@ function compress(file, max = 1280, q = 0.72) {
     img.src = url;
   });
 }
-function openReportForm(after) {
+function openReportForm(after, center) {
   if (!plan) return;
-  const draft = { kind: 'flooding', severity: 2, photo: null, ai: false, where: 'here' };
+  const draft = { kind: 'flooding', severity: 2, photo: null, ai: false, where: center ? 'map' : 'here' };
   openSheet(`<h2 id="sheetTitle">Report a storm problem</h2>
     <p class="muted small">People in your communities will see it. Don’t take photos in dangerous spots.</p>
     <label class="field-label">Where is it?</label>
-    <div class="sev-row" id="whereRow"><button type="button" data-where="here" aria-pressed="true">Where I am now</button><button type="button" data-where="place" aria-pressed="false">At ${esc(plan.label || 'my place')}</button></div>
+    <div class="sev-row ${center ? 'three' : ''}" id="whereRow">${center ? '<button type="button" data-where="map" aria-pressed="true">Center of the map</button>' : ''}<button type="button" data-where="here" aria-pressed="${!center}">Where I am now</button><button type="button" data-where="place" aria-pressed="false">At ${esc(plan.label || 'my place')}</button></div>
     <label class="photo-drop" id="drop"><input type="file" id="repFile" accept="image/*" capture="environment">${icon('camera')}<strong>Add a photo</strong><span class="small">AI will label it for you</span></label>
     <img class="photo-prev" id="repPrev" alt="" hidden>
     <div class="ai-note" id="aiNote" hidden></div>
@@ -811,6 +862,7 @@ function openReportForm(after) {
     const btn = $('#repSend');
     btn.disabled = true;
     let spot = { lat: plan.lat, lon: plan.lon };
+    if (draft.where === 'map' && center) spot = center;
     if (draft.where === 'here') {
       const h = await here();
       if (h) spot = h; else toast(`Couldn’t get your location, so it’s posted at ${plan.label || 'your place'}.`);
@@ -890,6 +942,7 @@ function switchView(v) {
   currentView = v;
   $$('.view').forEach((el) => el.classList.toggle('active', el.id === `view-${v}`));
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === (v === 'org' ? 'help' : v)));
+  if (v === 'map') renderMap();
   if (v === 'community') renderCommunity();
   if (v === 'news') renderNews();
   if (v === 'help' && plan) renderHelp();

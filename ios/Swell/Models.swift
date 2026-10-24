@@ -439,6 +439,22 @@ struct CommunityDetail: Codable {
     let inviteCode: String?
     let people: [Member]?
     let reports: [StormReport]
+    let center: Coord?
+    let places: [FamilyPin]?
+}
+
+struct Coord: Codable {
+    let lat: Double
+    let lon: Double
+}
+
+/// Roughly where a family member's place is (rounded to about 1 km).
+struct FamilyPin: Codable, Identifiable {
+    let who: String
+    let label: String
+    let lat: Double
+    let lon: Double
+    var id: String { "\(who)-\(label)-\(lat)-\(lon)" }
 }
 
 enum CommunityKind {

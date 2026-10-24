@@ -128,6 +128,9 @@ struct PlanView: View {
                         Button("Add another place", systemImage: "plus") { store.addingPlace = true }
                     } label: { Label("Places", systemImage: "mappin.and.ellipse") }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink { ChecklistView() } label: { Label("Checklist", systemImage: "checklist") }
+                }
             }
             .task { places = (try? await APIClient.shared.plans()) ?? [] }
         }
