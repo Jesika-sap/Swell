@@ -1,6 +1,6 @@
-# Tideline architecture
+# Swell architecture
 
-Tideline helps a household get ready for the 2026–27 El Niño. You give it an address, and it returns:
+Swell helps a household get ready for the 2026–27 El Niño. You give it an address, and it returns:
 - a storm risk score built from official public data, with every point explained
 - a checklist for your household, in your language
 - the nearest places to get sandbags and help

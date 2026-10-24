@@ -63,3 +63,42 @@ CREATE TABLE IF NOT EXISTS cache (
     value      TEXT NOT NULL,
     expires_at REAL NOT NULL
 );
+
+-- Organizations that offer help (food banks, volunteer groups, farm groups...).
+-- They stay "not verified" until the app's admin checks them.
+CREATE TABLE IF NOT EXISTS orgs (
+    id            TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    about         TEXT,
+    services      TEXT NOT NULL,     -- JSON list, e.g. ["volunteers", "food"]
+    area          TEXT,              -- e.g. "San Mateo County"
+    lat           REAL NOT NULL,
+    lon           REAL NOT NULL,
+    radius_miles  REAL NOT NULL DEFAULT 25,
+    email         TEXT,
+    phone         TEXT,
+    website       TEXT,
+    verified      INTEGER NOT NULL DEFAULT 0,
+    example       INTEGER NOT NULL DEFAULT 0,
+    key_hash      TEXT NOT NULL,     -- the organization's secret key, stored only as a hash
+    created_at    TEXT NOT NULL
+);
+
+-- A household asking for help. Organizations nearby that offer that kind of
+-- help can see it. Contact details are shown only to the one that accepts it.
+CREATE TABLE IF NOT EXISTS help_requests (
+    id          TEXT PRIMARY KEY,
+    plan_id     TEXT NOT NULL,
+    device_id   TEXT NOT NULL,
+    need        TEXT NOT NULL,
+    details     TEXT,
+    contact     TEXT,
+    lat         REAL NOT NULL,
+    lon         REAL NOT NULL,
+    area        TEXT,
+    status      TEXT NOT NULL DEFAULT 'open',   -- open, accepted, done, cancelled
+    org_id      TEXT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS help_geo ON help_requests (lat, lon);

@@ -78,15 +78,18 @@ Reply with ONLY JSON: {{"sites": [{{"name": "...", "address": "street address or
 def for_place(place, lat, lon):
     county = place.get("county")
     d = data()
+    country = (place.get("country") or "US").upper()
+    in_ca = country == "US" and (place.get("state") or "").upper() in ("CA", "CALIFORNIA")
     result = {
-        "alert_system": alert_system(county),
-        "county": d["county"].get(county or "", []),
-        "statewide": d["statewide"] if (place.get("state") or "").upper() in ("CA", "CALIFORNIA") else [d["statewide"][0], d["statewide"][1]],
+        "alert_system": alert_system(county) if country == "US" else None,
+        "county": d["county"].get(county or "", []) if country == "US" else [],
+        "statewide": d["statewide"] if in_ca else (d["statewide"][:2] if country == "US" else []),
+        "country": d.get("country", {}).get(country, []),
         "sandbags": sandbag_sites(county, lat, lon),
         "ai": None,
         "checked": d["checked"],
     }
-    if not result["sandbags"] and gemini.available():
+    if not result["sandbags"] and country == "US" and gemini.available():
         try:
             result["ai"] = ai_local_help(county, place.get("city"), place.get("state"))
         except ServiceError:

@@ -1,6 +1,6 @@
-# Tideline: get ready for El Niño
+# Swell: get ready for El Niño
 
-A strong El Niño is forecast for winter 2026–27. California declared a state of emergency on Sept 21, 2026, and San Mateo County declared a local emergency on Oct 20, 2026. Tideline helps any household get ready:
+A strong El Niño is forecast for winter 2026–27. California declared a state of emergency on Sept 21, 2026, and San Mateo County declared a local emergency on Oct 20, 2026. Swell helps any household get ready:
 
 - **Your storm risk, from official data.** It checks the FEMA flood map, USGS ground elevation, live National Weather Service alerts and king tide dates for your exact address, then shows a 0–100 score where every point names its source.
 - **A checklist made for your household,** in 10 languages including Spanish, Nepali, Chinese and Tagalog. It changes for older adults, people without a car, powered medical devices, pets, renters and hillside homes.
@@ -56,7 +56,7 @@ python -m unittest discover tests -v
 1. Sign in to https://render.com with GitHub.
 2. Click **New → Blueprint** and pick this repository. Render reads `render.yaml` and creates the server and the PostgreSQL database.
 3. When it asks for `GEMINI_API_KEY`, paste your key.
-4. Wait for the deploy, then open the address Render shows (something like `https://tideline.onrender.com`).
+4. Wait for the deploy, then open the address Render shows (something like `https://swell.onrender.com`).
 
 The free plan sleeps after 15 minutes without visitors, so the first visit can take about 30 seconds. Open it a minute before recording or presenting.
 

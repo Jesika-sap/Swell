@@ -18,7 +18,11 @@ def personalize(items, risk, place, household, language):
     lang = LANGUAGES.get(language, "English")
     slim = [{"id": i["id"], "title": i["title"], "why": i["why"]} for i in items]
     factors = "; ".join(f"{f['label']}: {f['detail']}" for f in risk["factors"] if f["points"] > 0)
-    who = ", ".join(k.replace("_", " ") for k, v in (household or {}).items() if v) or "not given"
+    h = household or {}
+    who = ", ".join(k.replace("_", " ") for k, v in h.items() if v is True) or "not given"
+    if h.get("role") == "farmer":
+        grows = ", ".join((h.get("farm") or {}).get("grows") or []) or "a farm"
+        who = f"a farmer ({grows}); household: {who}"
     prompt = f"""You help families get ready for a strong El Niño winter. Write in {lang}, in plain words a 12-year-old understands.
 Place: {place}. Storm risk: {risk['level']} ({risk['score']}/100). Why: {factors or 'no special risks found'}.
 Household: {who}.

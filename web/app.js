@@ -1,8 +1,8 @@
-/* Tideline web app. Talks to the Python API (backend/app.py).
+/* Swell web app. Talks to the Python API (backend/app.py).
    Sections: helpers · state · API · onboarding · plan · checklist · help · map + reports · news · boot */
 'use strict';
 
-const CFG = window.APP_CONFIG || { name: 'Tideline', apiBase: '' };
+const CFG = window.APP_CONFIG || { name: 'Swell', apiBase: '' };
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -31,7 +31,7 @@ function fmtDay(iso, opts = { month: 'short', day: 'numeric' }) {
 }
 
 /* ---------------- state (this device only) ---------------- */
-const STORE = 'tideline.v1';
+const STORE = 'swell.v1';
 function load() {
   try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; }
 }
@@ -72,6 +72,10 @@ const HOUSEHOLD = [
 ];
 const household = {};
 let pendingPlace = null;
+let role = 'household';
+const farm = { grows: [], workers: false, creek: false };
+const FARM_GROWS = [['vegetables', 'Vegetables'], ['field', 'Grains or field crops'], ['orchard', 'Orchards or vineyards'], ['livestock', 'Animals or poultry'], ['nursery', 'Flowers or nursery']];
+const FARM_MORE = [['workers', 'I have farmworkers'], ['creek', 'Fields near a creek or low ground']];
 
 function obShow(n) {
   $$('.ob-step').forEach((s) => { s.hidden = s.dataset.step !== String(n); });
@@ -96,6 +100,18 @@ $('#langSelect').innerHTML = LANGS.map(([k, v]) => `<option value="${k}">${esc(v
 $('#langSelect').value = state.language;
 $('#langSelect').addEventListener('change', (e) => { state.language = e.target.value; save(); });
 $('#obStart').addEventListener('click', () => obShow(2));
+$$('[data-role]').forEach((b) => b.addEventListener('click', () => { role = b.dataset.role; obShow(3); }));
+$('#farmPick').innerHTML = FARM_GROWS.map(([k, t]) => `<button class="pick" type="button" data-grow="${k}" aria-pressed="false"><strong>${esc(t)}</strong></button>`).join('');
+$('#farmMore').innerHTML = FARM_MORE.map(([k, t]) => `<button class="pick" type="button" data-farm="${k}" aria-pressed="false"><strong>${esc(t)}</strong></button>`).join('');
+$$('[data-grow]').forEach((b) => b.addEventListener('click', () => {
+  const k = b.dataset.grow, i = farm.grows.indexOf(k);
+  if (i >= 0) farm.grows.splice(i, 1); else farm.grows.push(k);
+  b.setAttribute('aria-pressed', String(i < 0));
+}));
+$$('[data-farm]').forEach((b) => b.addEventListener('click', () => { farm[b.dataset.farm] = !farm[b.dataset.farm]; b.setAttribute('aria-pressed', String(farm[b.dataset.farm])); }));
+$('#farmNext').addEventListener('click', () => obShow(5));
+$('#hhBack').addEventListener('click', () => obShow(role === 'farmer' ? 4 : 3));
+const afterPlace = () => obShow(role === 'farmer' ? 4 : 5);
 $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obShow(b.dataset.obBack)));
 $('#householdPick').innerHTML = HOUSEHOLD.map(([k, t, s, svg]) =>
   `<button class="pick" type="button" data-hh="${k}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg><strong>${esc(t)}</strong><small>${esc(s)}</small></button>`).join('');
@@ -109,7 +125,7 @@ $('#addrForm').addEventListener('submit', (e) => {
   const v = $('#addrInput').value.trim();
   if (v.length < 5) { toast('Type your full address, with the city.'); return; }
   pendingPlace = { address: v };
-  obShow(3);
+  afterPlace();
 });
 $('#useLocation').addEventListener('click', () => {
   if (!navigator.geolocation) { toast('Location isn’t available here. Type your address instead.'); return; }
@@ -118,7 +134,7 @@ $('#useLocation').addEventListener('click', () => {
   navigator.geolocation.getCurrentPosition((pos) => {
     b.disabled = false;
     pendingPlace = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-    obShow(3);
+    afterPlace();
   }, () => { b.disabled = false; toast('Couldn’t get your location. Type your address instead.'); }, { enableHighAccuracy: true, timeout: 12000 });
 });
 
@@ -131,16 +147,17 @@ const BUILD_STEPS = [
   ['Writing your checklist', 'Made for your household']
 ];
 $('#buildPlan').addEventListener('click', async () => {
-  if (!pendingPlace) { obShow(2); return; }
-  obShow(4);
+  if (!pendingPlace) { obShow(3); return; }
+  obShow(6);
   const steps = BUILD_STEPS.slice();
   if (state.language !== 'en') steps[5] = ['Writing your checklist', `In ${LANGS.find((l) => l[0] === state.language)[1]}`];
+  if (role === 'farmer') steps.splice(5, 0, ['Adding steps for your farm', 'Crops, animals, workers and records']);
   $('#buildSteps').innerHTML = steps.map(([t, s]) => `<li><span class="dot"></span><span>${esc(t)}<small>${esc(s)}</small></span></li>`).join('');
   const lis = $$('#buildSteps li');
   let i = 0;
   const tick = setInterval(() => { if (i < lis.length - 1) { lis[i].classList.add('on'); lis[i].querySelector('.dot').innerHTML = icon('check'); i++; } }, 650);
   try {
-    const p = await api('/api/plan', { method: 'POST', body: { ...pendingPlace, language: state.language, household, label: $('#labelInput').value.trim() || 'Home' } });
+    const p = await api('/api/plan', { method: 'POST', body: { ...pendingPlace, language: state.language, household, role, farm, label: $('#labelInput').value.trim() || (role === 'farmer' ? 'My farm' : 'Home') } });
     clearInterval(tick);
     lis.forEach((li) => { li.classList.add('on'); li.querySelector('.dot').innerHTML = icon('check'); });
     await new Promise((r) => setTimeout(r, 450));
@@ -149,7 +166,7 @@ $('#buildPlan').addEventListener('click', async () => {
     switchView('plan');
   } catch (err) {
     clearInterval(tick);
-    obShow(2);
+    obShow(3);
     toast(err.message, 5000);
   }
 });
@@ -187,7 +204,7 @@ function alertHTML(a) {
 function taskHTML(t) {
   return `<li class="task ${t.done ? 'done' : ''}" data-task="${esc(t.id)}">
     <button class="box" type="button" aria-label="${t.done ? 'Mark not done' : 'Mark done'}: ${esc(t.title)}" aria-pressed="${t.done}">${icon('check')}</button>
-    <div>${t.priority === 1 && !t.done ? '<span class="first">Do first</span>' : ''}<strong>${esc(t.title)}</strong><p>${esc(t.why)}</p>
+    <div>${t.source === 'scan' ? '<span class="from-scan">From your photo</span>' : ''}${t.priority === 1 && !t.done ? '<span class="first">Do first</span>' : ''}<strong>${esc(t.title)}</strong><p>${esc(t.why)}</p>
     ${t.link ? `<a href="${esc(t.link)}" target="_blank" rel="noopener">Open link</a>` : ''}</div></li>`;
 }
 
@@ -195,7 +212,11 @@ function renderPlan() {
   const page = $('#planPage');
   if (!plan) { page.innerHTML = ''; return; }
   const r = plan.risk;
-  const placeLine = [plan.place.city, plan.place.county ? `${plan.place.county} County` : null, plan.place.state].filter(Boolean).join(', ');
+  const intl = plan.place.country && plan.place.country !== 'US';
+  const placeLine = intl ? [plan.place.city, plan.place.county, plan.place.country].filter(Boolean).join(', ')
+    : [plan.place.city, plan.place.county ? `${plan.place.county} County` : null, plan.place.state].filter(Boolean).join(', ');
+  const hazard = r.hazard || 'flood';
+  const reg = r.region;
   const storm = (plan.alerts || []).filter((a) => a.storm_related);
   const next = plan.checklist.filter((t) => !t.done).slice(0, 3);
   const tides = r.king_tides || [];
@@ -205,8 +226,8 @@ function renderPlan() {
       <div class="risk-top">
         ${gaugeHTML(r.score, r.level)}
         <div>
-          <span class="risk-level lv-${r.level}">${LEVEL_TEXT[r.level]}</span>
-          <h2>Storm risk for ${esc(plan.label || 'this home')}</h2>
+          <div class="risk-tags"><span class="risk-level lv-${r.level}">${LEVEL_TEXT[r.level]}</span>${plan.role === 'farmer' ? '<span class="risk-tag">Farm plan</span>' : ''}<span class="risk-tag">${hazard === 'drought' ? 'Drought and heat' : 'Floods and storms'}</span></div>
+          <h2>El Niño risk for ${esc(plan.label || 'this home')}</h2>
           <p class="risk-place">${esc(placeLine)}</p>
         </div>
       </div>
@@ -214,7 +235,14 @@ function renderPlan() {
       ${plan.translated ? `<span class="risk-lang">Plan written in ${esc(langName)}</span>` : ''}
     </section>
 
-    ${storm.length ? storm.map(alertHTML).join('') : `<div class="alert alert-none">${icon('ok')}<div><strong>No storm alerts right now</strong><p>We check the National Weather Service every time you open the app.</p></div></div>`}
+    ${intl ? (reg ? `<section class="card region-card block"><p class="eyebrow">What El Niño usually does here</p><h3>${esc(reg.name)}</h3><span class="effect ${/wet/.test(reg.effect) ? 'eff-wet' : 'eff-dry'}">${esc(reg.effect)} · ${esc(reg.season)}</span><p class="small" style="margin:0">Live alerts and flood maps are U.S.-only for now. Follow your national weather office for warnings.</p></section>` : '')
+      : storm.length ? storm.map(alertHTML).join('') : `<div class="alert alert-none">${icon('ok')}<div><strong>No storm alerts right now</strong><p>We check the National Weather Service every time you open the app.</p></div></div>`}
+
+    <section class="block card scan-card">
+      <div class="scan-ic">${icon('camera')}</div>
+      <div><h3>AI Scan</h3><p class="small" style="margin:2px 0 0">Take a photo of your ${plan.role === 'farmer' ? 'field, barn or equipment' : 'home, yard or street'}. AI spots risks you can fix and adds them to your checklist.</p></div>
+      <button class="btn btn-primary" type="button" id="scanBtn">Scan a photo</button>
+    </section>
 
     <section class="block card">
       <div class="progress-row">
@@ -252,6 +280,32 @@ function renderPlan() {
   requestAnimationFrame(() => $$('.gauge .val', page).forEach((c) => { c.style.strokeDashoffset = c.dataset.target; }));
   bindTasks(page);
   $$('[data-go]', page).forEach((b) => b.addEventListener('click', () => switchView(b.dataset.go)));
+  $('#scanBtn').addEventListener('click', openScan);
+}
+
+function openScan() {
+  openSheet(`<h2 id="sheetTitle">AI Scan</h2>
+    <p class="muted small">Point your camera at a ${plan.role === 'farmer' ? 'field, ditch, barn or equipment' : 'front door, gutter, yard, garage or the street outside'}. The AI only reports what it can see. Photos aren’t saved.</p>
+    <label class="photo-drop" id="scanDrop"><input type="file" id="scanFile" accept="image/*" capture="environment">${icon('camera')}<strong>Take or choose a photo</strong></label>
+    <img class="photo-prev" id="scanPrev" alt="" hidden>
+    <div id="scanOut"></div>`);
+  $('#scanFile').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const out = $('#scanOut');
+    try {
+      const photo = await compress(f);
+      $('#scanPrev').src = photo; $('#scanPrev').hidden = false; $('#scanDrop').hidden = true;
+      out.innerHTML = '<p class="ai-note"><span class="spinner"></span> Looking for risks…</p>';
+      const d = await api(`/api/plan/${plan.id}/scan`, { method: 'POST', body: { photo } });
+      setPlan(d.plan);
+      out.innerHTML = `<p class="small muted" style="margin-top:12px">${esc(d.seen)}</p>
+        ${d.added.length ? `<h3 style="margin:10px 0 8px">Added ${d.added.length} ${d.added.length === 1 ? 'task' : 'tasks'} to your checklist</h3><ul class="tasks">${d.added.map((t) => `<li class="task"><span class="box" style="cursor:default"></span><div><strong>${esc(t.title)}</strong><p>${esc(t.why)}</p></div></li>`).join('')}</ul>`
+          : '<p class="notice" style="margin-top:10px">No new risks found in this photo. Try another spot.</p>'}
+        <button class="btn btn-ghost btn-wide" type="button" id="scanAgain">Scan another photo</button>`;
+      $('#scanAgain').addEventListener('click', openScan);
+    } catch (err) { out.innerHTML = `<p class="notice">${esc(err.message)}</p>`; }
+  });
 }
 
 /* ---------------- checklist ---------------- */
@@ -297,9 +351,17 @@ function renderHelp() {
   if (!plan) return;
   const h = plan.help;
   const sb = h.sandbags || [];
+  const intl = plan.place.country && plan.place.country !== 'US';
   page.innerHTML = `
     <h2>Help near ${esc(plan.place.city || 'you')}</h2>
-    <p class="muted">Where to get sandbags, alerts and support, closest first.</p>
+    <p class="muted">Ask for help, find local groups, sandbags and alerts.</p>
+    <section class="card ask-card block">
+      <h3>Need a hand?</h3>
+      <p class="small" style="margin:0">Ask local organizations for a ride, sandbags, a check-in call, farm help and more. Only groups that offer that help can see your request, and only the one that accepts it sees your contact.</p>
+      <button class="btn btn-primary" type="button" id="askHelp">Ask for help</button>
+      <div id="myRequests"></div>
+    </section>
+    <section class="block" id="orgSection"><div class="section-head"><h3>Organizations near you</h3></div><div id="orgList"><div class="card skeleton"><span></span><span></span></div></div></section>
     ${h.alert_system ? `<section class="card help-alert block">
       <p class="eyebrow" style="color:rgba(255,255,255,.7)">Step one for everyone</p>
       <h3>Sign up for ${esc(h.alert_system.name)}</h3>
@@ -321,15 +383,143 @@ function renderHelp() {
       </li>`).join('')}</ul>
       <p class="fineprint">AI found these from the sources below. Confirm with your city before you go.</p>
       <div class="sources">${h.ai.sources.map((s) => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>`).join('')}</div>`
-      : `<div class="notice">We haven’t checked sandbag sites for this area yet. Call 211 or search your city’s public works page.</div>`}
+      : `<div class="notice">${intl ? 'Sandbag sites are listed for California for now.' : 'We haven’t checked sandbag sites for this area yet. Call 211 or search your city’s public works page.'}</div>`}
     </section>
 
     ${h.county && h.county.length ? `<section class="block"><div class="section-head"><h3>${esc(plan.place.county)} County</h3></div>
       <ul class="res-list">${h.county.map(resHTML).join('')}</ul></section>` : ''}
-    <section class="block"><div class="section-head"><h3>Anywhere in California</h3></div>
-      <ul class="res-list">${h.statewide.map(resHTML).join('')}</ul></section>
-    <p class="fineprint center">In an emergency, call 911.</p>`;
+    ${h.country && h.country.length ? `<section class="block"><div class="section-head"><h3>Official sources</h3></div><ul class="res-list">${h.country.map(resHTML).join('')}</ul></section>` : ''}
+    ${h.statewide && h.statewide.length ? `<section class="block"><div class="section-head"><h3>${plan.place.state === 'CA' ? 'Anywhere in California' : 'Anywhere'}</h3></div>
+      <ul class="res-list">${h.statewide.map(resHTML).join('')}</ul></section>` : ''}
+    <div class="org-join"><strong>Are you an organization?</strong><span class="small muted">List the help you offer and see requests from people nearby.</span><button class="link-btn" type="button" id="orgJoin">${state.org ? 'Open your organization dashboard' : 'Join as an organization'}</button></div>
+    <p class="fineprint center">${plan.place.country && plan.place.country !== 'US' ? 'In an emergency, call your local emergency number.' : 'In an emergency, call 911.'}</p>`;
+  $('#askHelp').addEventListener('click', openAskHelp);
+  $('#orgJoin').addEventListener('click', () => (state.org ? openOrgDashboard() : openOrgSignup()));
+  loadHelpExtras();
 }
+/* ---------------- help requests + organizations ---------------- */
+let SERVICES = null;
+const STATUS_TEXT = { open: 'Waiting for a helper', accepted: 'Help is on the way', done: 'Done' };
+async function services() {
+  if (!SERVICES) SERVICES = await api('/api/services');
+  return SERVICES;
+}
+function orgHTML(o) {
+  return `<li class="org"><div class="org-top"><strong>${esc(o.name)}</strong>${o.example ? '<span class="badge badge-wait">Example</span>' : o.verified ? '<span class="badge badge-ok">Verified</span>' : '<span class="badge badge-wait">Not verified yet</span>'}</div>
+    ${o.about ? `<p>${esc(o.about)}</p>` : ''}
+    <div class="svc">${o.services.map((k) => `<span>${esc((SERVICES || {})[k] || k)}</span>`).join('')}</div>
+    <p class="small">${esc(o.area || '')}${o.miles != null ? ` · ${o.miles} mi away` : ''}</p>
+    <div class="res-actions">${o.website ? `<a href="${esc(o.website)}" target="_blank" rel="noopener">Website</a>` : ''}${o.email ? `<a href="mailto:${esc(o.email)}">Email</a>` : ''}${o.phone ? `<a href="tel:${esc(o.phone)}">Call</a>` : ''}</div></li>`;
+}
+function requestHTML(r) {
+  return `<div class="req"><div class="req-top"><strong>${esc(r.need_label)}</strong><span class="status st-${r.status}">${STATUS_TEXT[r.status] || r.status}</span></div>
+    ${r.details ? `<p class="small" style="margin:0">${esc(r.details)}</p>` : ''}
+    ${r.org ? `<p class="small" style="margin:0">${esc(r.org.name)} is helping${r.org.phone ? ` · <a href="tel:${esc(r.org.phone)}">${esc(r.org.phone)}</a>` : ''}${r.org.email ? ` · <a href="mailto:${esc(r.org.email)}">${esc(r.org.email)}</a>` : ''}</p>` : ''}
+    ${r.status === 'open' ? `<button class="link-btn" type="button" data-cancel="${r.id}">Cancel request</button>` : ''}</div>`;
+}
+function renderMyRequests(list) {
+  const el = $('#myRequests');
+  if (!el) return;
+  el.innerHTML = list.length ? `<div style="margin-top:6px">${list.map(requestHTML).join('')}</div>` : '';
+  $$('[data-cancel]', el).forEach((b) => b.addEventListener('click', async () => {
+    try { renderMyRequests(await api(`/api/plan/${plan.id}/help/${b.dataset.cancel}/cancel`, { method: 'POST' })); } catch (e) { toast(e.message); }
+  }));
+}
+async function loadHelpExtras() {
+  try { await services(); } catch (e) { /* labels fall back to keys */ }
+  try { renderMyRequests(await api(`/api/plan/${plan.id}/help`)); } catch (e) { /* offline */ }
+  try {
+    const orgs = await api(`/api/orgs?lat=${plan.lat}&lon=${plan.lon}`);
+    const el = $('#orgList');
+    if (el) el.innerHTML = orgs.length ? `<ul class="res-list">${orgs.map(orgHTML).join('')}</ul>` : '<div class="notice">No organizations have joined near here yet.</div>';
+  } catch (e) { const el = $('#orgList'); if (el) el.innerHTML = `<div class="notice">${esc(e.message)}</div>`; }
+}
+async function openAskHelp() {
+  let svc;
+  try { svc = await services(); } catch (e) { toast(e.message); return; }
+  let need = plan.role === 'farmer' ? 'farm' : 'checks';
+  openSheet(`<h2 id="sheetTitle">Ask for help</h2>
+    <p class="muted small">Organizations near ${esc(plan.place.city || 'you')} that offer this kind of help will see your request. This isn’t for emergencies: if you’re in danger, call 911.</p>
+    <p class="field-label">What do you need?</p>
+    <div class="need-grid">${Object.entries(svc).map(([k, v]) => `<button type="button" data-need="${k}" aria-pressed="${k === need}">${esc(v)}</button>`).join('')}</div>
+    <label class="field-label" for="helpDetails">Details <span class="opt">optional</span></label>
+    <textarea id="helpDetails" maxlength="500" placeholder="e.g. My garage floods. I'm 72 and can't lift sandbags."></textarea>
+    <label class="field-label" for="helpContact">Phone or email</label>
+    <input id="helpContact" type="text" maxlength="120" placeholder="Only the group that accepts will see this">
+    <button class="btn btn-primary btn-wide" type="button" id="helpSend">Send request</button>`);
+  $$('[data-need]').forEach((b) => b.addEventListener('click', () => { need = b.dataset.need; $$('[data-need]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
+  $('#helpSend').addEventListener('click', async () => {
+    const btn = $('#helpSend'); btn.disabled = true;
+    try {
+      const list = await api(`/api/plan/${plan.id}/help`, { method: 'POST', body: { need, details: $('#helpDetails').value.trim(), contact: $('#helpContact').value.trim() } });
+      closeSheet(); renderMyRequests(list); toast('Sent. You’ll see here when someone accepts.');
+    } catch (e) { btn.disabled = false; toast(e.message); }
+  });
+}
+async function openOrgSignup() {
+  let svc;
+  try { svc = await services(); } catch (e) { toast(e.message); return; }
+  const picked = new Set();
+  openSheet(`<h2 id="sheetTitle">Join as an organization</h2>
+    <p class="muted small">List the help you offer. People nearby can find you, and you’ll see their requests. New organizations show as “Not verified yet” until we check them.</p>
+    <label class="field-label" for="oName">Organization name</label><input id="oName" type="text" maxlength="80">
+    <label class="field-label" for="oAbout">What you do <span class="opt">optional</span></label><textarea id="oAbout" maxlength="400"></textarea>
+    <p class="field-label">Help you can offer</p>
+    <div class="need-grid">${Object.entries(svc).map(([k, v]) => `<button type="button" data-svc="${k}" aria-pressed="false">${esc(v)}</button>`).join('')}</div>
+    <label class="field-label" for="oAddr">Where you’re based</label><input id="oAddr" type="text" placeholder="City and state, or address" maxlength="200">
+    <label class="field-label" for="oRadius">How far you can help (miles)</label><input id="oRadius" type="text" inputmode="numeric" value="25">
+    <label class="field-label" for="oEmail">Email</label><input id="oEmail" type="text" maxlength="120">
+    <label class="field-label" for="oWeb">Website <span class="opt">optional</span></label><input id="oWeb" type="text" maxlength="200">
+    <label class="field-label" for="oPhone">Phone <span class="opt">optional</span></label><input id="oPhone" type="text" maxlength="40">
+    <button class="btn btn-primary btn-wide" type="button" id="oSend">Create organization</button>`);
+  $$('[data-svc]').forEach((b) => b.addEventListener('click', () => { const k = b.dataset.svc; if (picked.has(k)) picked.delete(k); else picked.add(k); b.setAttribute('aria-pressed', String(picked.has(k))); }));
+  $('#oSend').addEventListener('click', async () => {
+    const btn = $('#oSend'); btn.disabled = true;
+    try {
+      const res = await api('/api/orgs', { method: 'POST', body: { name: $('#oName').value.trim(), about: $('#oAbout').value.trim(), services: [...picked], address: $('#oAddr').value.trim() || undefined, lat: plan.lat, lon: plan.lon, radius_miles: $('#oRadius').value, email: $('#oEmail').value.trim(), website: $('#oWeb').value.trim(), phone: $('#oPhone').value.trim() } });
+      state.org = { id: res.org.id, key: res.key, name: res.org.name }; save();
+      openSheet(`<h2 id="sheetTitle">You’re on ${esc(CFG.name)}</h2><p>Save this key. It’s the only way to open your dashboard on another device.</p><div class="keybox">${esc(res.key)}</div>
+        <button class="btn btn-primary btn-wide" type="button" id="toDash">Open dashboard</button>`);
+      $('#toDash').addEventListener('click', () => { closeSheet(); openOrgDashboard(); });
+    } catch (e) { btn.disabled = false; toast(e.message); }
+  });
+}
+async function openOrgDashboard() {
+  switchView('org');
+  const page = $('#orgPage');
+  page.innerHTML = '<div class="card skeleton"><span></span><span></span><span></span></div>';
+  let d;
+  try {
+    await services();
+    const res = await fetch((CFG.apiBase || '') + `/api/orgs/${state.org.id}/dashboard`, { headers: { 'X-Org-Key': state.org.key } });
+    if (!res.ok) throw new Error('Couldn’t open the dashboard. Check your key.');
+    d = await res.json();
+  } catch (e) { page.innerHTML = `<div class="notice">${esc(e.message)}</div>`; return; }
+  const open = d.requests.filter((r) => r.status === 'open'), mine = d.requests.filter((r) => r.mine && r.status === 'accepted');
+  page.innerHTML = `<button class="back-link" type="button" id="orgBack">← Back to my plan</button>
+    <section class="card org-hero"><p class="eyebrow" style="color:rgba(255,255,255,.7)">Organization dashboard</p><h2 style="color:#fff">${esc(d.org.name)}</h2>
+      <p>${d.org.verified ? 'Verified' : 'Not verified yet'} · helping within ${d.org.radius_miles} miles</p>
+      <div class="org-stats"><div><b>${open.length}</b><span>new requests</span></div><div><b>${mine.length}</b><span>you’re helping</span></div><div><b>${d.helped}</b><span>helped so far</span></div></div></section>
+    <section class="block"><div class="section-head"><h3>You’re helping</h3></div>${mine.length ? mine.map((r) => orgReqHTML(r)).join('') : '<div class="notice">Accept a request below to see the person’s contact.</div>'}</section>
+    <section class="block"><div class="section-head"><h3>New requests near you</h3></div>${open.length ? open.map((r) => orgReqHTML(r)).join('') : '<div class="notice">No open requests right now.</div>'}</section>`;
+  $('#orgBack').addEventListener('click', () => switchView('help'));
+  $$('[data-act]', page).forEach((b) => b.addEventListener('click', async () => {
+    try {
+      const res = await fetch((CFG.apiBase || '') + `/api/orgs/${state.org.id}/requests/${b.dataset.id}/${b.dataset.act}`, { method: 'POST', headers: { 'X-Org-Key': state.org.key } });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || 'Something went wrong');
+      openOrgDashboard();
+    } catch (e) { toast(e.message); }
+  }));
+}
+function orgReqHTML(r) {
+  return `<div class="req"><div class="req-top"><strong>${esc(r.need_label)}</strong><span class="status st-${r.status}">${r.status === 'open' ? 'New' : 'Accepted'}</span></div>
+    <p class="small" style="margin:0">${esc(r.area || 'Nearby')} · ${esc(fmtDay(r.created_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}</p>
+    ${r.details ? `<p style="margin:0">${esc(r.details)}</p>` : ''}
+    ${r.contact ? `<p style="margin:0"><strong>Contact:</strong> ${esc(r.contact)}</p><div class="res-actions"><a href="${mapsLink(r.lat + ',' + r.lon)}" target="_blank" rel="noopener">Directions</a></div>` : ''}
+    <div class="res-actions">${r.status === 'open' ? `<button class="btn btn-primary btn-sm" type="button" data-act="accept" data-id="${r.id}">I can help</button>` : `<button class="btn btn-primary btn-sm" type="button" data-act="done" data-id="${r.id}">Mark done</button><button class="btn btn-ghost btn-sm" type="button" data-act="release" data-id="${r.id}">Can’t help after all</button>`}</div></div>`;
+}
+
 function resHTML(r) {
   return `<li><div class="res-top"><strong>${esc(r.name)}</strong></div><p>${esc(r.what)}</p>
     <div class="res-actions">${r.phone ? `<a href="tel:${esc(r.phone)}">Call ${esc(r.phone)}</a>` : ''}${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">Open</a>` : ''}</div></li>`;
@@ -452,7 +642,7 @@ async function renderNews() {
   if (newsTab === 'world') {
     try { regionsCache = regionsCache || await api('/api/regions'); } catch (e) { body.innerHTML = `<div class="notice">${esc(e.message)}</div>`; return; }
     body.innerHTML = `<p class="muted" style="margin-top:12px">The same El Niño brings different dangers to different places. ${esc(regionsCache.note)}</p>
-      ${regionsCache.regions.map((r) => `<div class="region ${r.id === 'california' && plan.place.state === 'CA' ? 'mine' : ''}">
+      ${regionsCache.regions.map((r) => `<div class="region ${plan.risk.region && r.id === plan.risk.region.id ? 'mine' : ''}">
         <div class="region-top"><strong>${esc(r.name)}</strong><span class="effect ${/wet/.test(r.effect) ? 'eff-wet' : 'eff-dry'}">${esc(r.effect)}</span></div>
         <small>${esc(r.season)}</small><p>${esc(r.impact)}</p><p class="small"><strong>Get ready:</strong> ${esc(r.prepare)}</p></div>`).join('')}
       <p class="fineprint">Source: <a href="${esc(regionsCache.source.url)}" target="_blank" rel="noopener">${esc(regionsCache.source.title)}</a></p>`;
@@ -476,9 +666,10 @@ let currentView = 'plan';
 function switchView(v) {
   currentView = v;
   $$('.view').forEach((el) => el.classList.toggle('active', el.id === `view-${v}`));
-  $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
+  $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === (v === 'org' ? 'help' : v)));
   if (v === 'map') renderMap();
   if (v === 'news') renderNews();
+  if (v === 'help' && plan) renderHelp();
   const sc = $(`#view-${v}`);
   if (sc) sc.scrollTop = 0;
 }
@@ -495,7 +686,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet
 $('#placeBtn').addEventListener('click', async () => {
   openSheet(`<h2 id="sheetTitle">Your places</h2><p class="muted small">Make a plan for each place you care about, like a grandparent’s home.</p><ul class="plans-list" id="plansList"><li class="skeleton"><span></span></li></ul>
     <button class="btn btn-primary btn-wide" type="button" id="addPlace">Add another place</button>`);
-  $('#addPlace').addEventListener('click', () => { closeSheet(); $('#addrInput').value = ''; $('#labelInput').value = ''; Object.keys(household).forEach((k) => { household[k] = false; }); $$('[data-hh]').forEach((b) => b.setAttribute('aria-pressed', 'false')); showOnboard(2); });
+  $('#addPlace').addEventListener('click', () => { closeSheet(); $('#addrInput').value = ''; $('#labelInput').value = ''; Object.keys(household).forEach((k) => { household[k] = false; }); $$('[data-hh]').forEach((b) => b.setAttribute('aria-pressed', 'false')); farm.grows = []; farm.workers = false; farm.creek = false; $$('[data-grow],[data-farm]').forEach((b) => b.setAttribute('aria-pressed', 'false')); showOnboard(2); });
   try {
     const list = await api('/api/plans');
     $('#plansList').innerHTML = list.map((p) => `<li><button type="button" data-plan="${p.id}" class="${p.id === state.current ? 'cur' : ''}"><span><strong>${esc(p.label)}</strong><small>${esc([p.city, p.state].filter(Boolean).join(', '))}</small></span><span class="risk-level lv-${p.level}">${p.score}</span></button></li>`).join('');

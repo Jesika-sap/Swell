@@ -2,44 +2,256 @@
   "note": "Hand-checked resources. Each site lists where the information came from. Sandbag sites change during the season, so the app always shows the source and asks people to confirm before driving there.",
   "checked": "2026-10-23",
   "statewide": [
-    {"id": "211", "kind": "help", "name": "211", "what": "Free, confidential help finding shelter, food, rides and other services, in many languages. Call or text 211.", "phone": "211", "url": "https://www.211.org"},
-    {"id": "redcross-shelter", "kind": "shelter", "name": "Red Cross: find an open shelter", "what": "Lists emergency shelters open during disasters.", "url": "https://www.redcross.org/get-help/disaster-relief-and-recovery-services/find-an-open-shelter.html"},
-    {"id": "myhazards", "kind": "info", "name": "Cal OES MyHazards", "what": "California's official tool to see flood, fire and earthquake hazards for any address.", "url": "https://myhazards.caloes.ca.gov"},
-    {"id": "fema-map", "kind": "info", "name": "FEMA Flood Map Service Center", "what": "Official flood maps used for flood insurance.", "url": "https://msc.fema.gov/portal/home"},
-    {"id": "quickmap", "kind": "roads", "name": "Caltrans QuickMap", "what": "Live highway closures, chain controls and incidents.", "url": "https://quickmap.dot.ca.gov"},
-    {"id": "pge-outages", "kind": "power", "name": "PG&E outage map", "what": "See and report power outages in Northern and Central California.", "url": "https://pgealerts.alerts.pge.com/outage-center/"},
-    {"id": "pge-medical", "kind": "power", "name": "PG&E Medical Baseline", "what": "For households that depend on powered medical devices: extra notice before planned outages and lower rates.", "url": "https://www.pge.com/en/account/billing-and-assistance/financial-assistance/medical-condition-related-programs.html"},
-    {"id": "nfip", "kind": "insurance", "name": "National Flood Insurance Program", "what": "Flood insurance for owners and renters. Most new policies take 30 days to start, so buy before storms arrive.", "url": "https://www.floodsmart.gov"}
+    {
+      "id": "211",
+      "kind": "help",
+      "name": "211",
+      "what": "Free, confidential help finding shelter, food, rides and other services, in many languages. Call or text 211.",
+      "phone": "211",
+      "url": "https://www.211.org"
+    },
+    {
+      "id": "redcross-shelter",
+      "kind": "shelter",
+      "name": "Red Cross: find an open shelter",
+      "what": "Lists emergency shelters open during disasters.",
+      "url": "https://www.redcross.org/get-help/disaster-relief-and-recovery-services/find-an-open-shelter.html"
+    },
+    {
+      "id": "myhazards",
+      "kind": "info",
+      "name": "Cal OES MyHazards",
+      "what": "California's official tool to see flood, fire and earthquake hazards for any address.",
+      "url": "https://myhazards.caloes.ca.gov"
+    },
+    {
+      "id": "fema-map",
+      "kind": "info",
+      "name": "FEMA Flood Map Service Center",
+      "what": "Official flood maps used for flood insurance.",
+      "url": "https://msc.fema.gov/portal/home"
+    },
+    {
+      "id": "quickmap",
+      "kind": "roads",
+      "name": "Caltrans QuickMap",
+      "what": "Live highway closures, chain controls and incidents.",
+      "url": "https://quickmap.dot.ca.gov"
+    },
+    {
+      "id": "pge-outages",
+      "kind": "power",
+      "name": "PG&E outage map",
+      "what": "See and report power outages in Northern and Central California.",
+      "url": "https://pgealerts.alerts.pge.com/outage-center/"
+    },
+    {
+      "id": "pge-medical",
+      "kind": "power",
+      "name": "PG&E Medical Baseline",
+      "what": "For households that depend on powered medical devices: extra notice before planned outages and lower rates.",
+      "url": "https://www.pge.com/en/account/billing-and-assistance/financial-assistance/medical-condition-related-programs.html"
+    },
+    {
+      "id": "nfip",
+      "kind": "insurance",
+      "name": "National Flood Insurance Program",
+      "what": "Flood insurance for owners and renters. Most new policies take 30 days to start, so buy before storms arrive.",
+      "url": "https://www.floodsmart.gov"
+    }
   ],
   "alert_systems": {
-    "Alameda": {"name": "AC Alert", "url": "https://member.everbridge.net/453003085612570/login"},
-    "Contra Costa": {"name": "Community Warning System", "url": "https://www.cwsalerts.com"},
-    "Marin": {"name": "AlertMarin", "url": "https://emergency.marincounty.gov/sign-alertmarin"},
-    "Napa": {"name": "ALERT Napa County", "url": "https://readynapacounty.gov/214/ALERT-Napa-County"},
-    "San Francisco": {"name": "AlertSF", "url": "https://sf.gov/sign-up-for-alertsf"},
-    "San Mateo": {"name": "SMC Alert", "url": "https://www.smcgov.org/dem/smc-alert"},
-    "Santa Clara": {"name": "AlertSCC", "url": "https://oem.santaclaracounty.gov/sign-up-for-alerts"},
-    "Santa Cruz": {"name": "CruzAware", "url": "https://www.santacruzcountyca.gov"},
-    "Sonoma": {"name": "SoCoAlert", "url": "https://socoemergency.org/get-ready/sign-up/socoalert/"}
+    "Alameda": {
+      "name": "AC Alert",
+      "url": "https://member.everbridge.net/453003085612570/login"
+    },
+    "Contra Costa": {
+      "name": "Community Warning System",
+      "url": "https://www.cwsalerts.com"
+    },
+    "Marin": {
+      "name": "AlertMarin",
+      "url": "https://emergency.marincounty.gov/sign-alertmarin"
+    },
+    "Napa": {
+      "name": "ALERT Napa County",
+      "url": "https://readynapacounty.gov/214/ALERT-Napa-County"
+    },
+    "San Francisco": {
+      "name": "AlertSF",
+      "url": "https://sf.gov/sign-up-for-alertsf"
+    },
+    "San Mateo": {
+      "name": "SMC Alert",
+      "url": "https://www.smcgov.org/dem/smc-alert"
+    },
+    "Santa Clara": {
+      "name": "AlertSCC",
+      "url": "https://oem.santaclaracounty.gov/sign-up-for-alerts"
+    },
+    "Santa Cruz": {
+      "name": "CruzAware",
+      "url": "https://www.santacruzcountyca.gov"
+    },
+    "Sonoma": {
+      "name": "SoCoAlert",
+      "url": "https://socoemergency.org/get-ready/sign-up/socoalert/"
+    }
   },
   "county": {
     "San Mateo": [
-      {"id": "smc-oneshoreline", "kind": "info", "name": "OneShoreline", "what": "San Mateo County's flood and sea level rise agency, with flood preparedness tools.", "url": "https://oneshoreline.org"},
-      {"id": "smc-roads", "kind": "roads", "name": "County road closures", "what": "San Mateo County's map of closed roads during storms.", "url": "https://www.smcgov.org/ceo/news/county-prepares-winter-storms-urges-residents-do-same"},
-      {"id": "smc-sandbag-info", "kind": "sandbags", "name": "County sandbag information", "what": "County storm preparedness and sandbag page.", "url": "https://www.smcgov.org/publicworks/sandbags"}
+      {
+        "id": "smc-oneshoreline",
+        "kind": "info",
+        "name": "OneShoreline",
+        "what": "San Mateo County's flood and sea level rise agency, with flood preparedness tools.",
+        "url": "https://oneshoreline.org"
+      },
+      {
+        "id": "smc-roads",
+        "kind": "roads",
+        "name": "County road closures",
+        "what": "San Mateo County's map of closed roads during storms.",
+        "url": "https://www.smcgov.org/ceo/news/county-prepares-winter-storms-urges-residents-do-same"
+      },
+      {
+        "id": "smc-sandbag-info",
+        "kind": "sandbags",
+        "name": "County sandbag information",
+        "what": "County storm preparedness and sandbag page.",
+        "url": "https://www.smcgov.org/publicworks/sandbags"
+      }
     ]
   },
   "sandbag_sites": [
-    {"id": "sm-corp", "county": "San Mateo", "city": "San Mateo", "name": "San Mateo Corporation Yard", "address": "1949 Pacific Blvd, San Mateo, CA", "notes": "Self-serve 24/7, Oct 1 to Apr 30. Up to 10 bags per vehicle. San Mateo residents or property owners. Bring a shovel. Pre-filled bags for people with physical limitations: call 650-522-7297.", "phone": "650-522-7297", "source": "https://www.cityofsanmateo.org/4750/Sandbag-Information"},
-    {"id": "sm-beresford", "county": "San Mateo", "city": "San Mateo", "name": "Beresford Park parking lot", "address": "2720 Alameda de las Pulgas, San Mateo, CA", "notes": "Self-serve 24/7, Oct 1 to Apr 30. Up to 10 bags per vehicle. Bring a shovel.", "source": "https://www.cityofsanmateo.org/4750/Sandbag-Information"},
-    {"id": "sm-anchor", "county": "San Mateo", "city": "San Mateo", "name": "Anchor Road / Bay Trail parking lot", "address": "Anchor Rd and J. Hart Clinton Dr, San Mateo, CA", "notes": "Self-serve 24/7, Oct 1 to Apr 30. Up to 10 bags per vehicle. Bring a shovel.", "source": "https://www.cityofsanmateo.org/4750/Sandbag-Information"},
-    {"id": "rwc-broadway", "county": "San Mateo", "city": "Redwood City", "name": "Redwood City Public Works Services Yard", "address": "1400 Broadway, Redwood City, CA", "notes": "City sandbag site.", "source": "https://www.almanacnews.com/environment/2026/10/21/san-mateo-county-declares-el-nino-state-of-emergency-to-prepare-for-winter-storms/"},
-    {"id": "rwc-grant", "county": "San Mateo", "city": "Redwood City (unincorporated)", "name": "Grant Corporation Yard (County)", "address": "752 Chestnut St, Redwood City, CA", "notes": "For unincorporated-area residents. Reservation needed for pre-made bags; bring ID. Up to 15 free pre-made bags per season. Bulk sand and bags 24/7.", "phone": "650-363-4103", "source": "https://www.smcgov.org/publicworks/sandbags"},
-    {"id": "mp-burgess", "county": "San Mateo", "city": "Menlo Park", "name": "Burgess Park parking lot", "address": "Burgess Dr and Alma St, Menlo Park, CA", "notes": "City sandbag site.", "source": "https://www.almanacnews.com/environment/2026/10/21/san-mateo-county-declares-el-nino-state-of-emergency-to-prepare-for-winter-storms/"},
-    {"id": "mp-fire77", "county": "San Mateo", "city": "Menlo Park", "name": "Fire Station 77", "address": "1467 Chilco St, Menlo Park, CA", "notes": "City sandbag site.", "source": "https://www.almanacnews.com/environment/2026/10/21/san-mateo-county-declares-el-nino-state-of-emergency-to-prepare-for-winter-storms/"},
-    {"id": "epa-yard", "county": "San Mateo", "city": "East Palo Alto", "name": "East Palo Alto Public Works Corporation Yard", "address": "150 Tara Rd, East Palo Alto, CA", "notes": "City sandbag site.", "source": "https://www.almanacnews.com/environment/2026/10/21/san-mateo-county-declares-el-nino-state-of-emergency-to-prepare-for-winter-storms/"},
-    {"id": "hmb-princeton", "county": "San Mateo", "city": "Half Moon Bay (Princeton)", "name": "Princeton Corporation Yard (County)", "address": "203 Cornell Ave, Half Moon Bay, CA", "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.", "phone": "650-728-7993", "source": "https://www.smcgov.org/publicworks/sandbags"},
-    {"id": "lahonda-yard", "county": "San Mateo", "city": "La Honda", "name": "La Honda Corporation Yard (County)", "address": "59 Entrada Way, La Honda, CA", "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.", "phone": "650-747-0341", "source": "https://www.smcgov.org/publicworks/sandbags"},
-    {"id": "pescadero-yard", "county": "San Mateo", "city": "Pescadero", "name": "Pescadero Corporation Yard (County)", "address": "1000 Pescadero Creek Rd, Pescadero, CA", "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.", "phone": "650-879-0202", "source": "https://www.smcgov.org/publicworks/sandbags"}
-  ]
+    {
+      "id": "sm-corp",
+      "county": "San Mateo",
+      "city": "San Mateo",
+      "name": "San Mateo Corporation Yard",
+      "address": "1949 Pacific Blvd, San Mateo, CA",
+      "notes": "Self-serve 24/7, Oct 1 to Apr 30. Up to 10 bags per vehicle. San Mateo residents or property owners. Bring a shovel. Pre-filled bags for people with physical limitations: call 650-522-7297.",
+      "phone": "650-522-7297",
+      "source": "https://www.cityofsanmateo.org/4750/Sandbag-Information"
+    },
+    {
+      "id": "sm-beresford",
+      "county": "San Mateo",
+      "city": "San Mateo",
+      "name": "Beresford Park parking lot",
+      "address": "2720 Alameda de las Pulgas, San Mateo, CA",
+      "notes": "Self-serve 24/7, Oct 1 to Apr 30. Up to 10 bags per vehicle. Bring a shovel.",
+      "source": "https://www.cityofsanmateo.org/4750/Sandbag-Information"
+    },
+    {
+      "id": "sm-anchor",
+      "county": "San Mateo",
+      "city": "San Mateo",
+      "name": "Anchor Road / Bay Trail parking lot",
+      "address": "Anchor Rd and J. Hart Clinton Dr, San Mateo, CA",
+      "notes": "Self-serve 24/7, Oct 1 to Apr 30. Up to 10 bags per vehicle. Bring a shovel.",
+      "source": "https://www.cityofsanmateo.org/4750/Sandbag-Information"
+    },
+    {
+      "id": "rwc-broadway",
+      "county": "San Mateo",
+      "city": "Redwood City",
+      "name": "Redwood City Public Works Services Yard",
+      "address": "1400 Broadway, Redwood City, CA",
+      "notes": "City sandbag site.",
+      "source": "https://www.almanacnews.com/environment/2026/10/21/san-mateo-county-declares-el-nino-state-of-emergency-to-prepare-for-winter-storms/"
+    },
+    {
+      "id": "rwc-grant",
+      "county": "San Mateo",
+      "city": "Redwood City (unincorporated)",
+      "name": "Grant Corporation Yard (County)",
+      "address": "752 Chestnut St, Redwood City, CA",
+      "notes": "For unincorporated-area residents. Reservation needed for pre-made bags; bring ID. Up to 15 free pre-made bags per season. Bulk sand and bags 24/7.",
+      "phone": "650-363-4103",
+      "source": "https://www.smcgov.org/publicworks/sandbags"
+    },
+    {
+      "id": "mp-burgess",
+      "county": "San Mateo",
+      "city": "Menlo Park",
+      "name": "Burgess Park parking lot",
+      "address": "Burgess Dr and Alma St, Menlo Park, CA",
+      "notes": "City sandbag site.",
+      "source": "https://www.almanacnews.com/environment/2026/10/21/san-mateo-county-declares-el-nino-state-of-emergency-to-prepare-for-winter-storms/"
+    },
+    {
+      "id": "mp-fire77",
+      "county": "San Mateo",
+      "city": "Menlo Park",
+      "name": "Fire Station 77",
+      "address": "1467 Chilco St, Menlo Park, CA",
+      "notes": "City sandbag site.",
+      "source": "https://www.almanacnews.com/environment/2026/10/21/san-mateo-county-declares-el-nino-state-of-emergency-to-prepare-for-winter-storms/"
+    },
+    {
+      "id": "epa-yard",
+      "county": "San Mateo",
+      "city": "East Palo Alto",
+      "name": "East Palo Alto Public Works Corporation Yard",
+      "address": "150 Tara Rd, East Palo Alto, CA",
+      "notes": "City sandbag site.",
+      "source": "https://www.almanacnews.com/environment/2026/10/21/san-mateo-county-declares-el-nino-state-of-emergency-to-prepare-for-winter-storms/"
+    },
+    {
+      "id": "hmb-princeton",
+      "county": "San Mateo",
+      "city": "Half Moon Bay (Princeton)",
+      "name": "Princeton Corporation Yard (County)",
+      "address": "203 Cornell Ave, Half Moon Bay, CA",
+      "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.",
+      "phone": "650-728-7993",
+      "source": "https://www.smcgov.org/publicworks/sandbags"
+    },
+    {
+      "id": "lahonda-yard",
+      "county": "San Mateo",
+      "city": "La Honda",
+      "name": "La Honda Corporation Yard (County)",
+      "address": "59 Entrada Way, La Honda, CA",
+      "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.",
+      "phone": "650-747-0341",
+      "source": "https://www.smcgov.org/publicworks/sandbags"
+    },
+    {
+      "id": "pescadero-yard",
+      "county": "San Mateo",
+      "city": "Pescadero",
+      "name": "Pescadero Corporation Yard (County)",
+      "address": "1000 Pescadero Creek Rd, Pescadero, CA",
+      "notes": "Pre-made bags (limited), bulk sand and bags 24/7. No reservation needed.",
+      "phone": "650-879-0202",
+      "source": "https://www.smcgov.org/publicworks/sandbags"
+    }
+  ],
+  "country": {
+    "NP": [
+      {
+        "id": "np-dhm",
+        "kind": "info",
+        "name": "Department of Hydrology and Meteorology (Nepal)",
+        "what": "Nepal's official weather and monsoon forecasts and warnings.",
+        "url": "https://www.dhm.gov.np"
+      },
+      {
+        "id": "np-drr",
+        "kind": "info",
+        "name": "Nepal Disaster Risk Reduction Portal",
+        "what": "The government's disaster information and alerts portal.",
+        "url": "http://drrportal.gov.np"
+      },
+      {
+        "id": "np-moald",
+        "kind": "help",
+        "name": "Ministry of Agriculture and Livestock Development",
+        "what": "National agriculture ministry. Ask your local agriculture knowledge center about seeds and support.",
+        "url": "https://moald.gov.np"
+      }
+    ]
+  }
 }

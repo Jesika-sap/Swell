@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Tideline</title>
+  <title>Swell</title>
   <meta name="description" content="Get your home and family ready for El Niño storms: your flood risk, a personal checklist in your language, and help nearby.">
   <meta name="theme-color" content="#0b3349">
   <link rel="manifest" href="manifest.webmanifest">
@@ -25,7 +25,7 @@
     <div class="ob-step" data-step="1">
       <div class="ob-hero">
         <div class="ob-wave" aria-hidden="true"></div>
-        <p class="ob-brand"><span class="logo" aria-hidden="true"></span><span class="app-name">Tideline</span></p>
+        <p class="ob-brand"><span class="logo" aria-hidden="true"></span><span class="app-name">Swell</span></p>
         <h1>A strong El Niño is coming. Let’s get your home ready.</h1>
         <p class="ob-lead">In about a minute, see your home’s storm risk, get a checklist made for your family, in your language, and find help nearby.</p>
       </div>
@@ -39,12 +39,23 @@
     </div>
 
     <div class="ob-step" data-step="2" hidden>
-      <div class="ob-top"><button class="back-link" type="button" data-ob-back="1">← Back</button><span class="ob-count">Step 1 of 2</span></div>
-      <h2>Where do you live?</h2>
+      <div class="ob-top"><button class="back-link" type="button" data-ob-back="1">← Back</button><span class="ob-count">Getting started</span></div>
+      <h2>Who is this plan for?</h2>
+      <p class="muted">El Niño hits homes and farms differently. Pick the one that fits.</p>
+      <div class="roles">
+        <button class="role-card" type="button" data-role="household"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg><span><strong>My home and family</strong><small>Flood risk, a household checklist, help nearby</small></span></button>
+        <button class="role-card" type="button" data-role="farmer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V10"/><path d="M12 10c0-3 2-5 5-5 0 3-2 5-5 5zM12 14c0-3-2-5-5-5 0 3 2 5 5 5z"/><path d="M5 21h14"/></svg><span><strong>My farm or ranch</strong><small>Crops, animals, workers and your home</small></span></button>
+      </div>
+    </div>
+
+    <div class="ob-step" data-step="3" hidden>
+      <div class="ob-top"><button class="back-link" type="button" data-ob-back="2">← Back</button><span class="ob-count">Location</span></div>
+      <h2>Where is it?</h2>
       <p class="muted">We check the official flood map, ground height and live weather alerts for this exact spot.</p>
       <form id="addrForm" autocomplete="on">
-        <label class="field-label" for="addrInput">Home address</label>
+        <label class="field-label" for="addrInput">Address or town</label>
         <input id="addrInput" type="text" placeholder="e.g. 100 Murchison Dr, Millbrae, CA" autocomplete="street-address" required>
+        <p class="fineprint" style="margin-top:6px">Works anywhere in the world. Outside the U.S., type the town and country, like “Bharatpur, Chitwan, Nepal.”</p>
         <button class="btn btn-primary btn-wide" type="submit">Continue</button>
       </form>
       <div class="or"><span>or</span></div>
@@ -54,15 +65,26 @@
       <p class="fineprint">Making a plan for a grandparent or a relative? Use their address and name it, like “Grandma’s house.”</p>
     </div>
 
-    <div class="ob-step" data-step="3" hidden>
-      <div class="ob-top"><button class="back-link" type="button" data-ob-back="2">← Back</button><span class="ob-count">Step 2 of 2</span></div>
+    <div class="ob-step" data-step="4" hidden>
+      <div class="ob-top"><button class="back-link" type="button" data-ob-back="3">← Back</button><span class="ob-count">Your farm</span></div>
+      <h2>Tell us about your farm</h2>
+      <p class="muted">Your plan changes with what you grow and who works with you.</p>
+      <p class="field-label">What do you grow or raise?</p>
+      <div class="chips-pick" id="farmPick"></div>
+      <p class="field-label">Anything else?</p>
+      <div class="chips-pick" id="farmMore"></div>
+      <button class="btn btn-primary btn-wide" type="button" id="farmNext">Continue</button>
+    </div>
+
+    <div class="ob-step" data-step="5" hidden>
+      <div class="ob-top"><button class="back-link" type="button" id="hhBack">← Back</button><span class="ob-count">Almost done</span></div>
       <h2>Who lives here?</h2>
       <p class="muted">Pick everything that fits. It changes what goes on your checklist. Nothing here is shared.</p>
       <div class="chips-pick" id="householdPick"></div>
       <button class="btn btn-primary btn-wide" type="button" id="buildPlan">Build my plan</button>
     </div>
 
-    <div class="ob-step" data-step="4" hidden>
+    <div class="ob-step" data-step="6" hidden>
       <div class="building">
         <div class="building-wave" aria-hidden="true"><span></span><span></span><span></span></div>
         <h2>Building your plan</h2>
@@ -78,7 +100,7 @@
       <span id="placeName">Home</span>
       <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
-    <span class="wordmark"><span class="logo" aria-hidden="true"></span><span class="app-name">Tideline</span></span>
+    <span class="wordmark"><span class="logo" aria-hidden="true"></span><span class="app-name">Swell</span></span>
     <button class="icon-btn" type="button" id="refreshBtn" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
   </header>
 
@@ -92,6 +114,7 @@
     </section>
     <section id="view-help" class="view" aria-label="Help nearby"><div class="page" id="helpPage"></div></section>
     <section id="view-news" class="view" aria-label="News"><div class="page" id="newsPage"></div></section>
+    <section id="view-org" class="view" aria-label="Organization dashboard"><div class="page" id="orgPage"></div></section>
   </main>
 
   <nav class="tabbar" id="tabbar" aria-label="Main" hidden>

@@ -11,7 +11,7 @@ final class APIClient {
     static let shared = APIClient()
 
     let deviceId: String = {
-        let key = "tideline.deviceId"
+        let key = "swell.deviceId"
         if let id = UserDefaults.standard.string(forKey: key) { return id }
         let id = UUID().uuidString
         UserDefaults.standard.set(id, forKey: key)

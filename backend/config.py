@@ -6,7 +6,7 @@ dashboard; locally they can go in a .env file that git ignores.
 """
 import os
 
-APP_NAME = os.environ.get("APP_NAME", "Tideline")
+APP_NAME = os.environ.get("APP_NAME", "Swell")
 
 # Google Gemini (AI): one key, used only by this server.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -33,6 +33,9 @@ CACHE_TTL = {
     "news": 6 * 3600,
     "aihelp": 3 * 86400,
 }
+
+# Secret for the app owner to mark organizations as verified (set on Render).
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 
 HTTP_TIMEOUT = float(os.environ.get("HTTP_TIMEOUT", "12"))
 MAX_PHOTO_BYTES = 700_000  # after the app compresses it

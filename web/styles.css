@@ -1,4 +1,4 @@
-/* Tideline — calm, clear, official-feeling. Deep ocean blue for trust,
+/* Swell — calm, clear, official-feeling. Deep ocean blue for trust,
    teal for action, amber/red only for real risk. */
 :root {
   --bg: #f1f4f6;
@@ -305,3 +305,51 @@ main { position: fixed; top: calc(var(--topbar-h) + env(safe-area-inset-top)); b
 .spinner { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* roles + farm */
+.roles { display: grid; gap: 12px; margin-top: 18px; }
+.role-card { display: grid; grid-template-columns: 52px 1fr; gap: 14px; align-items: center; text-align: left; padding: 18px; border-radius: 18px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; box-shadow: var(--card-shadow); }
+.role-card:hover { border-color: var(--sea); }
+.role-card svg { width: 52px; height: 52px; padding: 12px; border-radius: 14px; background: var(--sea-soft); color: var(--sea); }
+.role-card strong { display: block; font-size: 17px; }
+.role-card small { color: var(--muted); font-size: 14px; }
+.risk-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.risk-tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; background: rgba(255,255,255,.14); color: #fff; }
+.region-card { display: grid; gap: 6px; }
+.region-card .effect { justify-self: start; }
+
+/* help requests + organizations */
+.ask-card { display: grid; gap: 8px; border: 1.5px solid var(--sea); background: var(--sea-soft); }
+.ask-card h3 { color: var(--ink); }
+.req { display: grid; gap: 4px; padding: 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.req + .req { margin-top: 8px; }
+.req-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.status { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.st-open { background: var(--elev-soft); color: var(--elev); }
+.st-accepted { background: var(--sea-soft); color: var(--link); }
+.st-done { background: var(--low-soft); color: var(--low); }
+.need-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.need-grid button { text-align: left; padding: 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }
+.need-grid button[aria-pressed="true"] { border-color: var(--sea); background: var(--sea-soft); }
+textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: 12px; padding: 12px 14px; min-height: 80px; resize: vertical; }
+.org { display: grid; gap: 6px; padding: 14px; }
+.org-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.badge { font-size: 11.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.badge-ok { background: var(--low-soft); color: var(--low); }
+.badge-wait { background: var(--surface-2); color: var(--muted); }
+.svc { display: flex; flex-wrap: wrap; gap: 6px; }
+.svc span { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); }
+.org-join { display: grid; gap: 4px; text-align: center; padding: 18px; border-radius: 16px; border: 1.5px dashed var(--line-strong); margin-top: 22px; }
+.keybox { font-family: ui-monospace, Menlo, monospace; font-size: 14px; padding: 12px; border-radius: 10px; background: var(--surface-2); word-break: break-all; }
+.org-hero { background: linear-gradient(160deg, var(--ocean), var(--ocean-2)); color: #fff; border: 0; }
+.org-hero p { color: rgba(255,255,255,.85); margin: 0; }
+.org-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.org-stats div { background: rgba(255,255,255,.1); border-radius: 12px; padding: 10px; display: grid; }
+.org-stats b { font-family: var(--display); font-size: 24px; }
+.org-stats span { font-size: 12px; color: rgba(255,255,255,.75); }
+
+/* AI scan */
+.scan-card { display: grid; grid-template-columns: auto 1fr; gap: 12px 14px; align-items: center; border: 1.5px solid var(--sea); }
+.scan-card .btn { grid-column: 1 / -1; }
+.scan-ic svg { width: 46px; height: 46px; padding: 10px; border-radius: 14px; background: var(--sea); color: var(--sea-ink); }
+.from-scan { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--sea); margin: 0 8px 2px 0; }

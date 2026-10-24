@@ -9,7 +9,7 @@
     </style>
   </defs>
   <rect width="1200" height="720" fill="#f3f6f8"/>
-  <text x="40" y="52" font-size="30" font-weight="800" fill="#0b3349">Tideline: how it works</text>
+  <text x="40" y="52" font-size="30" font-weight="800" fill="#0b3349">Swell: how it works</text>
   <text x="40" y="80" class="s">One Python server, shared by the web app and the iPhone app. Secrets and AI stay on the server.</text>
 
   <!-- clients -->

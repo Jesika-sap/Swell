@@ -54,6 +54,10 @@ def fake(method, url, **kw):
     if "geocoding.geo.census.gov" in url and "coordinates" in url:
         return 200, {"result": {"geographies": {"Counties": [{"NAME": "San Mateo County"}], "Incorporated Places": [{"NAME": "Millbrae"}], "States": [{"STUSAB": "CA"}]}}}
     if "nominatim" in url:
+        q = (params.get("q") or "").lower()
+        if "nepal" in q or "chitwan" in q:
+            return 200, [{"lat": "27.5291", "lon": "84.3542", "display_name": "Bharatpur, Chitwan, Nepal",
+                          "address": {"city": "Bharatpur", "county": "Chitwan", "state": "Bagmati Province", "country_code": "np"}}]
         return 200, []
 
     if "api.weather.gov/alerts" in url:
@@ -105,6 +109,10 @@ def fake(method, url, **kw):
             text = "```json\n" + json.dumps({"headline": "San Mateo County declared an El Niño emergency.", "items": [
                 {"title": "County declares El Niño emergency", "date": "Oct 20, 2026", "summary": "The board created a task force.", "action": "Sign up for SMC Alert."}]}) + "\n```"
             meta = {"groundingChunks": [{"web": {"uri": "https://example.org/a", "title": "smcgov.org"}}, {"web": {"uri": "https://example.org/b", "title": "almanacnews.com"}}]}
+        elif "Find up to 5 specific things" in prompt:
+            text = json.dumps({"seen": "The front of a one-story house with a gutter and a downspout.", "findings": [
+                {"title": "Point the downspout away from the house", "why": "The downspout empties right against the wall, so rain will pool by the foundation.", "urgency": 1},
+                {"title": "Clear leaves out of the gutter", "why": "Leaves are piled in the gutter over the door, so water will spill over in heavy rain.", "urgency": 2}]})
         elif "reported during a storm" in prompt:
             text = json.dumps({"is_storm_problem": True, "kind": "drain", "title": "Clogged storm drain on corner", "severity": 2, "advice": "Don't clear it during the storm."})
         else:

@@ -3,9 +3,12 @@
 It also serves the web app (../web), so the website and the API share one
 address and one deployment.
 """
+import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
 import time
 import uuid
 from collections import defaultdict, deque
@@ -15,7 +18,7 @@ from flask import Flask, jsonify, request, send_from_directory, abort, g
 
 import config
 import db
-from services import geocode, weather, flood, risk, checklist, resources, news, ai_plan, gemini, photo_ai
+from services import geocode, weather, flood, risk, checklist, resources, news, ai_plan, gemini, photo_ai, scan as scan_svc, region as regions_svc
 from services.http import ServiceError
 
 WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
@@ -74,7 +77,7 @@ def _cors(resp):
     if origin and ("*" in config.ALLOWED_ORIGINS or origin in config.ALLOWED_ORIGINS):
         resp.headers["Access-Control-Allow-Origin"] = origin
         resp.headers["Vary"] = "Origin"
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Device-Id"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Device-Id, X-Org-Key, X-Admin-Token"
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
@@ -151,6 +154,8 @@ def regions():
 
 
 HOUSEHOLD_KEYS = ("kids", "older_adult", "disability", "medical_device", "pets", "no_car", "renter", "lives_alone", "hillside")
+ROLES = ("household", "farmer")
+FARM_GROWS = ("vegetables", "field", "orchard", "livestock", "nursery")
 
 
 def gather(lat, lon, place):
@@ -181,6 +186,12 @@ def make_plan():
     d = body()
     language = d.get("language") if d.get("language") in ai_plan.LANGUAGES else "en"
     household = {k: bool((d.get("household") or {}).get(k)) for k in HOUSEHOLD_KEYS}
+    role = d.get("role") if d.get("role") in ROLES else "household"
+    farm = None
+    if role == "farmer":
+        f = d.get("farm") or {}
+        farm = {"grows": [g for g in (f.get("grows") or []) if g in FARM_GROWS],
+                "workers": bool(f.get("workers")), "creek": bool(f.get("creek"))}
     label = str(d.get("label") or "Home")[:40]
 
     try:
@@ -195,12 +206,16 @@ def make_plan():
         raise BadRequest(str(e))
 
     live, missing = gather(lat, lon, place)
+    reg = regions_svc.for_place(place)
     r = risk.score(flood=live["flood"], elevation=live["elevation"], alerts=live["alerts"], rain=live["rain"],
-                   county=place.get("county"), state=place.get("state"), tides=TIDES)
+                   county=place.get("county"), state=place.get("state"), tides=TIDES, region=reg, role=role)
     help_ = resources.for_place(place, lat, lon)
     items = checklist.build(r, household, county=place.get("county"), alert_system=help_["alert_system"],
-                            nearest_sandbags=(help_["sandbags"] or [None])[0])
-    place_name = ", ".join(x for x in [place.get("city"), place.get("state")] if x) or "your area"
+                            nearest_sandbags=(help_["sandbags"] or [None])[0], role=role, farm=farm, region=reg)
+    household = {**household, "role": role, "farm": farm}
+    if place.get("country") and place.get("country") != "US":
+        missing = [m for m in missing if m not in ("alerts", "forecast", "flood", "elevation")]
+    place_name = ", ".join(x for x in [place.get("city"), place.get("state"), place.get("country") if place.get("country") not in (None, "US") else None] if x) or "your area"
     summary, translated = None, False
     if gemini.available():
         try:
@@ -216,7 +231,7 @@ def make_plan():
     db.execute("""INSERT INTO plans (id, device_id, label, address, lat, lon, county, city, state, language,
                   household, risk, checklist, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                (plan_id, device, label, place.get("address"), lat, lon, place.get("county"), place.get("city"),
-                place.get("state"), language, json.dumps(household), json.dumps({**r, "summary": summary}),
+                place.get("state"), language, json.dumps({**household, "country": place.get("country") or "US"}), json.dumps({**r, "summary": summary}),
                 json.dumps(items), ts, ts))
     return jsonify(plan_payload(plan_id, live=live, help_=help_, missing=missing, translated=translated)), 201
 
@@ -229,7 +244,10 @@ def plan_payload(plan_id, live=None, help_=None, missing=None, translated=False)
     items = json.loads(row["checklist"])
     for i in items:
         i["done"] = i["id"] in done
-    place = {"county": row["county"], "city": row["city"], "state": row["state"]}
+    hh = json.loads(row["household"])
+    place = {"county": row["county"], "city": row["city"], "state": row["state"], "country": hh.get("country", "US")}
+    if live is None and place["country"] != "US":
+        live, missing = {"alerts": [], "forecast": [], "rain": None}, []
     if live is None:  # reopening a saved plan: refresh only the fast-changing parts
         live = {"alerts": [], "forecast": [], "rain": None}
         missing = []
@@ -248,7 +266,7 @@ def plan_payload(plan_id, live=None, help_=None, missing=None, translated=False)
     return {
         "id": row["id"], "label": row["label"], "address": row["address"],
         "lat": row["lat"], "lon": row["lon"], "place": place, "language": row["language"],
-        "household": json.loads(row["household"]), "risk": r, "summary": r.get("summary"),
+        "household": hh, "role": hh.get("role", "household"), "farm": hh.get("farm"), "risk": r, "summary": r.get("summary"),
         "checklist": items, "progress": {"done": len(done & {i["id"] for i in items}), "total": len(items)},
         "alerts": live["alerts"], "forecast": live["forecast"][:6], "rain": live["rain"],
         "help": help_, "enso": ENSO, "missing": missing or [], "translated": translated,
@@ -407,6 +425,230 @@ def clear_report(rid):
         abort(404)
     db.execute("UPDATE reports SET status = 'cleared' WHERE id = ?", (rid,))
     return jsonify({"ok": True})
+
+
+# ---------------- AI Scan
+
+@app.post("/api/plan/<plan_id>/scan")
+def scan_photo(plan_id):
+    own_plan(plan_id)
+    rate_limit("scan", 20)
+    photo = valid_photo(body().get("photo"))
+    if not photo:
+        raise BadRequest("Add a photo to scan")
+    if not gemini.available():
+        raise BadRequest("AI Scan needs the server's AI key")
+    row = db.one("SELECT * FROM plans WHERE id = ?", (plan_id,))
+    r, hh = json.loads(row["risk"]), json.loads(row["household"])
+    place = ", ".join(x for x in [row["city"], row["state"], hh.get("country") if hh.get("country") != "US" else None] if x) or "their area"
+    try:
+        result = scan_svc.scan(photo, hazard=r.get("hazard", "flood"), role=hh.get("role", "household"),
+                               place=place, language=row["language"])
+    except ServiceError as e:
+        raise BadRequest(f"AI couldn't check that photo ({e}). Try another one.")
+    items = json.loads(row["checklist"])
+    have = {i["id"] for i in items}
+    added = [f for f in result["findings"] if f["id"] not in have]
+    items = added + items
+    db.execute("UPDATE plans SET checklist = ?, updated_at = ? WHERE id = ?", (json.dumps(items), now_iso(), plan_id))
+    return jsonify({"seen": result["seen"], "added": added, "plan": plan_payload(plan_id)})
+
+
+# ---------------- organizations and help requests
+
+SERVICES = {
+    "sandbags": "Sandbags or sandbagging help",
+    "rides": "Rides or help leaving",
+    "checks": "Check-in calls and visits",
+    "shelter": "A place to stay",
+    "food": "Food and water",
+    "translation": "Translation",
+    "farm": "Help on farms (animals, equipment)",
+    "cleanup": "Volunteers for cleanup",
+    "supplies": "Supplies (batteries, tarps, masks)",
+}
+
+
+def _hash(key):
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def org_public(o, lat=None, lon=None):
+    out = {k: o[k] for k in ("id", "name", "about", "area", "email", "phone", "website", "radius_miles", "lat", "lon")}
+    out["services"] = json.loads(o["services"])
+    out["verified"] = bool(o["verified"])
+    out["example"] = bool(o["example"])
+    if lat is not None:
+        out["miles"] = round(resources.miles(lat, lon, o["lat"], o["lon"]), 1)
+    return out
+
+
+def own_org(org_id):
+    key = request.headers.get("X-Org-Key", "")
+    o = db.one("SELECT * FROM orgs WHERE id = ?", (org_id,))
+    if not o or not key or not hmac.compare_digest(o["key_hash"], _hash(key)):
+        abort(404)
+    return o
+
+
+@app.get("/api/services")
+def list_services():
+    return jsonify(SERVICES)
+
+
+@app.get("/api/orgs")
+def list_orgs():
+    lat, lon = coords(request.args)
+    rows = db.query("SELECT * FROM orgs ORDER BY verified DESC, created_at")
+    out = [org_public(o, lat, lon) for o in rows]
+    out = [o for o in out if o["miles"] <= o["radius_miles"]]
+    out.sort(key=lambda o: (not o["verified"], o["miles"]))
+    return jsonify(out)
+
+
+def create_org_row(d, lat, lon, example=False):
+    name = str(d.get("name") or "").strip()[:80]
+    if len(name) < 2:
+        raise BadRequest("Organization name is required")
+    services = [s for s in (d.get("services") or []) if s in SERVICES]
+    if not services:
+        raise BadRequest("Pick at least one kind of help you offer")
+    email = str(d.get("email") or "").strip()[:120]
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise BadRequest("That email doesn't look right")
+    website = str(d.get("website") or "").strip()[:200]
+    if website and not website.startswith(("http://", "https://")):
+        website = "https://" + website
+    try:
+        radius = max(1.0, min(float(d.get("radius_miles") or 25), 200.0))
+    except (TypeError, ValueError):
+        radius = 25.0
+    key = secrets.token_urlsafe(18)
+    oid = uuid.uuid4().hex[:12]
+    db.execute("""INSERT INTO orgs (id, name, about, services, area, lat, lon, radius_miles, email, phone, website, verified, example, key_hash, created_at)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               (oid, name, str(d.get("about") or "")[:400], json.dumps(services), str(d.get("area") or "")[:80] or None,
+                lat, lon, radius, email or None, str(d.get("phone") or "")[:40] or None, website or None,
+                0, 1 if example else 0, _hash(key), now_iso()))
+    return oid, key
+
+
+@app.post("/api/orgs")
+def create_org():
+    rate_limit("org", 10)
+    d = body()
+    try:
+        if d.get("address"):
+            g = geocode.geocode(str(d["address"])[:200])
+            lat, lon = g["lat"], g["lon"]
+            d.setdefault("area", ", ".join(x for x in [g.get("city"), f"{g['county']} County" if g.get("county") else None] if x))
+        else:
+            lat, lon = coords(d)
+    except ServiceError as e:
+        raise BadRequest(str(e))
+    oid, key = create_org_row(d, lat, lon)
+    o = db.one("SELECT * FROM orgs WHERE id = ?", (oid,))
+    return jsonify({"org": org_public(o), "key": key}), 201
+
+
+@app.post("/api/orgs/<org_id>/verify")
+def verify_org(org_id):
+    token = request.headers.get("X-Admin-Token", "")
+    if not config.ADMIN_TOKEN or not hmac.compare_digest(token, config.ADMIN_TOKEN):
+        abort(404)
+    db.execute("UPDATE orgs SET verified = 1 WHERE id = ?", (org_id,))
+    return jsonify({"ok": True})
+
+
+def request_for_org(r, org_id):
+    mine = r["org_id"] == org_id
+    return {
+        "id": r["id"], "need": r["need"], "need_label": SERVICES.get(r["need"], r["need"]), "details": r["details"],
+        "status": r["status"], "area": r["area"], "created_at": r["created_at"],
+        # Exact location and contact only for the organization that accepted it.
+        "lat": r["lat"] if mine else round(r["lat"], 2), "lon": r["lon"] if mine else round(r["lon"], 2),
+        "contact": r["contact"] if mine else None, "mine": mine,
+    }
+
+
+@app.get("/api/orgs/<org_id>/dashboard")
+def org_dashboard(org_id):
+    o = own_org(org_id)
+    services = set(json.loads(o["services"]))
+    rows = db.query("SELECT * FROM help_requests WHERE status IN ('open', 'accepted') ORDER BY created_at DESC LIMIT 300")
+    reqs = [request_for_org(r, org_id) for r in rows
+            if (r["status"] == "open" and r["need"] in services and resources.miles(o["lat"], o["lon"], r["lat"], r["lon"]) <= o["radius_miles"])
+            or r["org_id"] == org_id]
+    done = db.one("SELECT COUNT(*) AS n FROM help_requests WHERE org_id = ? AND status = 'done'", (org_id,))["n"]
+    return jsonify({"org": org_public(o), "requests": reqs, "helped": done})
+
+
+@app.post("/api/orgs/<org_id>/requests/<rid>/<action>")
+def org_act(org_id, rid, action):
+    own_org(org_id)
+    r = db.one("SELECT * FROM help_requests WHERE id = ?", (rid,))
+    if not r:
+        abort(404)
+    if action == "accept":
+        if r["status"] != "open":
+            raise BadRequest("Someone else already took this request")
+        db.execute("UPDATE help_requests SET status = 'accepted', org_id = ?, updated_at = ? WHERE id = ? AND status = 'open'", (org_id, now_iso(), rid))
+    elif action == "done":
+        if r["org_id"] != org_id:
+            abort(404)
+        db.execute("UPDATE help_requests SET status = 'done', updated_at = ? WHERE id = ?", (now_iso(), rid))
+    elif action == "release":
+        if r["org_id"] != org_id:
+            abort(404)
+        db.execute("UPDATE help_requests SET status = 'open', org_id = NULL, updated_at = ? WHERE id = ?", (now_iso(), rid))
+    else:
+        abort(404)
+    return jsonify(request_for_org(db.one("SELECT * FROM help_requests WHERE id = ?", (rid,)), org_id))
+
+
+def my_requests(plan_id):
+    rows = db.query("SELECT * FROM help_requests WHERE plan_id = ? AND status != 'cancelled' ORDER BY created_at DESC", (plan_id,))
+    out = []
+    for r in rows:
+        org = db.one("SELECT * FROM orgs WHERE id = ?", (r["org_id"],)) if r["org_id"] else None
+        out.append({"id": r["id"], "need": r["need"], "need_label": SERVICES.get(r["need"], r["need"]), "details": r["details"],
+                    "status": r["status"], "created_at": r["created_at"], "updated_at": r["updated_at"],
+                    "org": org_public(org) if org else None})
+    return out
+
+
+@app.get("/api/plan/<plan_id>/help")
+def get_help_requests(plan_id):
+    own_plan(plan_id)
+    return jsonify(my_requests(plan_id))
+
+
+@app.post("/api/plan/<plan_id>/help")
+def ask_for_help(plan_id):
+    own_plan(plan_id)
+    rate_limit("help", 15)
+    d = body()
+    need = d.get("need")
+    if need not in SERVICES:
+        raise BadRequest("Pick what kind of help you need")
+    contact = str(d.get("contact") or "").strip()[:120]
+    if len(contact) < 5:
+        raise BadRequest("Add a phone number or email so a helper can reach you")
+    row = db.one("SELECT lat, lon, city, county FROM plans WHERE id = ?", (plan_id,))
+    rid = uuid.uuid4().hex[:12]
+    ts = now_iso()
+    db.execute("""INSERT INTO help_requests (id, plan_id, device_id, need, details, contact, lat, lon, area, status, created_at, updated_at)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+               (rid, plan_id, g.device, need, str(d.get("details") or "")[:500], contact, row["lat"], row["lon"],
+                ", ".join(x for x in [row["city"], f"{row['county']} County" if row["county"] else None] if x) or None, "open", ts, ts))
+    return jsonify(my_requests(plan_id)), 201
+
+
+@app.post("/api/plan/<plan_id>/help/<rid>/cancel")
+def cancel_help(plan_id, rid):
+    own_plan(plan_id)
+    db.execute("UPDATE help_requests SET status = 'cancelled', updated_at = ? WHERE id = ? AND plan_id = ?", (now_iso(), rid, plan_id))
+    return jsonify(my_requests(plan_id))
 
 
 # ---------------------------------------------------------------- web app

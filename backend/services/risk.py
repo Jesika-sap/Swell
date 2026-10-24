@@ -37,7 +37,8 @@ def king_tide_windows(tides, today=None):
     return out
 
 
-def score(*, flood=None, elevation=None, alerts=None, rain=None, county=None, state=None, tides=None, today=None):
+def score(*, flood=None, elevation=None, alerts=None, rain=None, county=None, state=None, tides=None, today=None,
+          region=None, role="household"):
     factors = []
 
     def add(key, points, label, detail, source):
@@ -83,8 +84,23 @@ def score(*, flood=None, elevation=None, alerts=None, rain=None, county=None, st
     # 6. El Nino season baseline for California
     if (state or "").upper() in ("CA", "CALIFORNIA"):
         add("el_nino", 5, "El Niño winter", "A strong El Niño is forecast, which usually means more and stronger storms in California.", "NOAA Climate Prediction Center")
+    elif region:
+        # Outside California we usually can't get local flood maps, so the
+        # regional El Nino pattern carries more of the score.
+        add("el_nino", 20, "El Niño where you live",
+            f"{region['name']} is usually {region['effect']} in El Niño years ({region['season']}). {region['impact']}",
+            "NOAA Climate.gov")
+
+    # 7. Farms: income and food depend on the weather
+    haz = "drought" if region and "drier" in region["effect"] else "flood"
+    if role == "farmer":
+        detail = ("A weak or late monsoon can mean lost harvests, less water for animals and lost income."
+                  if haz == "drought" else
+                  "Flooded fields, washed-out soil and stranded animals hit farms first, and recovery takes longer.")
+        add("livelihood", 10, "Your farm depends on the weather", detail, "Your answers")
 
     total = min(100, sum(f["points"] for f in factors))
     level = "high" if total >= HIGH else "elevated" if total >= ELEVATED else "lower"
     factors.sort(key=lambda f: -f["points"])
-    return {"score": total, "level": level, "factors": factors, "king_tides": tide_windows}
+    return {"score": total, "level": level, "factors": factors, "king_tides": tide_windows, "hazard": haz,
+            "region": {k: region[k] for k in ("id", "name", "effect", "season")} if region else None}

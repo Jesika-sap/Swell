@@ -2,7 +2,7 @@ import SwiftUI
 import Observation
 
 @main
-struct TidelineApp: App {
+struct SwellApp: App {
     @State private var store = AppStore()
 
     var body: some Scene {
@@ -21,19 +21,19 @@ final class AppStore {
     var plan: Plan?
     var error: String?
     var addingPlace = false
-    private(set) var language: String = UserDefaults.standard.string(forKey: "tideline.lang") ?? "en"
-    private(set) var currentId: String? = UserDefaults.standard.string(forKey: "tideline.current")
+    private(set) var language: String = UserDefaults.standard.string(forKey: "swell.lang") ?? "en"
+    private(set) var currentId: String? = UserDefaults.standard.string(forKey: "swell.current")
 
     var isLoadingSaved: Bool { currentId != nil && plan == nil && error == nil }
 
     func setLanguage(_ code: String) {
         language = code
-        UserDefaults.standard.set(code, forKey: "tideline.lang")
+        UserDefaults.standard.set(code, forKey: "swell.lang")
     }
 
     private func setCurrent(_ id: String?) {
         currentId = id
-        UserDefaults.standard.set(id, forKey: "tideline.current")
+        UserDefaults.standard.set(id, forKey: "swell.current")
     }
 
     func loadSaved() async {
