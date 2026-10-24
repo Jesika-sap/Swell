@@ -17,7 +17,7 @@ fi
 
 # Load the saved key, if there is one.
 GEMINI_API_KEY=""
-[ -f .env ] && { set -a; . ./.env; set +a; }
+[ -f .env ] && GEMINI_API_KEY="$(grep -m1 '^GEMINI_API_KEY=' .env | cut -d= -f2- | tr -d "[:space:]'\"")"
 
 # Ask until we get a key that isn't empty.
 while [ -z "$GEMINI_API_KEY" ]; do
@@ -25,7 +25,7 @@ while [ -z "$GEMINI_API_KEY" ]; do
   echo "Paste your Gemini API key (from https://aistudio.google.com/apikey) and press Enter."
   echo "Nothing shows while you paste. That's normal. Type 'skip' to run without AI."
   read -r -s KEY
-  KEY="$(echo "$KEY" | tr -d '[:space:]')"
+  KEY="$(echo "$KEY" | tr -d "[:space:]'\"")"
   if [ "$KEY" = "skip" ]; then break; fi
   if [ -z "$KEY" ]; then echo "That was empty. Copy the key again and paste it with Cmd+V."; continue; fi
   echo "GEMINI_API_KEY=$KEY" > .env
