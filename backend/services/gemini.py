@@ -23,12 +23,17 @@ def available():
     return bool(config.GEMINI_API_KEY)
 
 
-def _models():
-    out = [config.GEMINI_MODEL] + [m for m in FALLBACK_MODELS if m != config.GEMINI_MODEL]
+def _models(first=None):
+    out = []
+    for m in list(first or []) + [config.GEMINI_MODEL] + FALLBACK_MODELS:
+        if m not in out:
+            out.append(m)
     return out
 
 
-def generate(parts, *, json_mode=False, temperature=0.3, search=False):
+def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=None):
+    """`models` puts stronger models first for one call (AI Scan uses Pro);
+    the usual Flash models stay behind them as a fallback."""
     """Returns (text, grounding_metadata)."""
     if not available():
         raise ServiceError("AI is not set up on this server")
@@ -40,7 +45,7 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False):
         body["tools"] = [{"google_search": {}}]
     headers = {"x-goog-api-key": config.GEMINI_API_KEY}
     last = None
-    for model in _models():
+    for model in _models(models):
         try:
             data = post_json(f"{BASE}/{model}:generateContent", body, headers)
         except ServiceError as e:

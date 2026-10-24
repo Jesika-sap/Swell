@@ -249,7 +249,12 @@ class ScanTests(unittest.TestCase):
         res = c.post(f"/api/plan/{plan['id']}/scan", json={"photo": photo}, headers=DEV)
         self.assertEqual(res.status_code, 200, res.get_json())
         d = res.get_json()
-        self.assertEqual(len(d["added"]), 2)
+        self.assertEqual(len(d["added"]), 2)  # the low-confidence guess is dropped
+        self.assertEqual(d["added"][0]["title"], "Point the downspout away from the house")  # most urgent first
+        self.assertIn("Fix:", d["added"][0]["why"])
+        self.assertIn("right corner", d["added"][0]["why"])
+        self.assertEqual(d["good"], ["Doormat area is raised above the walkway"])
+        self.assertTrue(d["next_photo"])
         self.assertEqual(d["plan"]["checklist"][0]["source"], "scan")
         self.assertEqual(d["plan"]["progress"]["total"], plan["progress"]["total"] + 2)
         again = c.post(f"/api/plan/{plan['id']}/scan", json={"photo": photo}, headers=DEV).get_json()

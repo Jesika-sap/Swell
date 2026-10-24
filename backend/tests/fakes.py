@@ -109,10 +109,12 @@ def fake(method, url, **kw):
             text = "```json\n" + json.dumps({"headline": "San Mateo County declared an El Niño emergency.", "items": [
                 {"title": "County declares El Niño emergency", "date": "Oct 20, 2026", "summary": "The board created a task force.", "action": "Sign up for SMC Alert."}]}) + "\n```"
             meta = {"groundingChunks": [{"web": {"uri": "https://example.org/a", "title": "smcgov.org"}}, {"web": {"uri": "https://example.org/b", "title": "almanacnews.com"}}]}
-        elif "Find up to 5 specific things" in prompt:
+        elif "disaster-preparedness inspector" in prompt:
             text = json.dumps({"seen": "The front of a one-story house with a gutter and a downspout.", "findings": [
-                {"title": "Point the downspout away from the house", "why": "The downspout empties right against the wall, so rain will pool by the foundation.", "urgency": 1},
-                {"title": "Clear leaves out of the gutter", "why": "Leaves are piled in the gutter over the door, so water will spill over in heavy rain.", "urgency": 2}]})
+                {"title": "Clear leaves out of the gutter", "where": "top of the photo, above the door", "why": "Leaves are piled in the gutter, so water will spill over in heavy rain.", "fix": "Scoop the leaves out and rinse with a hose.", "effort": "easy", "urgency": 2, "confidence": "high"},
+                {"title": "Point the downspout away from the house", "where": "right corner of the house", "why": "The downspout empties right against the wall, so rain will pool by the foundation.", "fix": "Add a downspout extension that ends 4 feet from the wall.", "effort": "easy", "urgency": 1, "confidence": "high"},
+                {"title": "Check the roof for loose shingles", "why": "Something on the roof might be loose.", "urgency": 2, "confidence": "low"}],
+                "good": ["Doormat area is raised above the walkway"], "next_photo": "The roof gutters from below"})
         elif "reported during a storm" in prompt:
             text = json.dumps({"is_storm_problem": True, "kind": "drain", "title": "Clogged storm drain on corner", "severity": 2, "advice": "Don't clear it during the storm."})
         else:

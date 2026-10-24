@@ -302,6 +302,8 @@ function openScan() {
       out.innerHTML = `<p class="small muted" style="margin-top:12px">${esc(d.seen)}</p>
         ${d.added.length ? `<h3 style="margin:10px 0 8px">Added ${d.added.length} ${d.added.length === 1 ? 'task' : 'tasks'} to your checklist</h3><ul class="tasks">${d.added.map((t) => `<li class="task"><span class="box" style="cursor:default"></span><div><strong>${esc(t.title)}</strong><p>${esc(t.why)}</p></div></li>`).join('')}</ul>`
           : '<p class="notice" style="margin-top:10px">No new risks found in this photo. Try another spot.</p>'}
+        ${(d.good || []).length ? `<h3 style="margin:14px 0 6px">Already done right</h3><ul class="small" style="margin:0 0 8px;padding-left:18px">${d.good.map((g) => `<li>${esc(g)}</li>`).join('')}</ul>` : ''}
+        ${d.next_photo ? `<p class="ai-note small">Next, take a photo of: <strong>${esc(d.next_photo)}</strong></p>` : ''}
         <button class="btn btn-ghost btn-wide" type="button" id="scanAgain">Scan another photo</button>`;
       $('#scanAgain').addEventListener('click', openScan);
     } catch (err) { out.innerHTML = `<p class="notice">${esc(err.message)}</p>`; }

@@ -240,6 +240,8 @@ struct Region: Codable, Identifiable {
 struct ScanResult: Codable {
     let seen: String
     let added: [PlanTask]
+    let good: [String]?
+    let nextPhoto: String?  // "next_photo" (the decoder converts snake_case)
     let plan: Plan
 }
 

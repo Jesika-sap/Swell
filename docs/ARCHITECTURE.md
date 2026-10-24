@@ -62,7 +62,8 @@ flowchart LR
 - **A server at all (instead of calling AI from the browser).** My first app, StreetVoice, called the AI straight from the browser, so every user had to paste in their own API key. That's not how real apps work, and it's not safe. Here the Gemini key lives only on the server, in an environment variable, and never reaches the phone or the browser.
 - **PostgreSQL in production, SQLite locally.** Postgres is a real multi-user database. Render hosts it, and everyone's reports land in one place. SQLite needs no setup, so I can run the whole app and its tests on my laptop. `db.py` lets the same SQL run on both.
 - **Official public data instead of AI for the risk score.** A risk number for someone's home has to be consistent and checkable. FEMA, USGS and the National Weather Service are the official sources, they're free, and the same address always gets the same score. The AI never decides anyone's risk.
-- **Gemini for language and search.** One model handles text, images and Google Search grounding. Grounding matters because news summaries come with the real links the model used, so people can check them.
+- **Gemini for language and search.** One model family handles text, images and Google Search grounding. Grounding matters because news summaries come with the real links the model used, so people can check them. It also has a free tier, which matters for a student project.
+- **Gemini Pro for AI Scan.** Reading a photo the way an inspector would is the hardest AI job in Swell, so AI Scan asks the stronger Pro model first and falls back to Flash if Pro is busy or out of quota.
 - **A web app *and* a native iPhone app.** The web app works on any phone with no download, which matters for people who won't install an app during an emergency. The iPhone app adds the camera, maps and notifications that feel native, and it's the path to the App Store.
 - **Render for hosting.** It deploys straight from GitHub, runs Python, hosts Postgres, and has a free tier. The whole setup is one file: `render.yaml`.
 
@@ -164,7 +165,7 @@ help_requests    id, plan_id, device_id, need, details, contact, lat, lon, area,
 - **Bad inputs, privacy between devices, and AI help search with sources.**
 - **News with sources, the report flow** (including once-per-device confirmations and rejected non-photo uploads), and caching.
 - **Farmers and regions:** a California farmer gets a flood farm plan, and a farmer in Chitwan, Nepal gets a drought plan.
-- **AI Scan:** a scan adds tasks to the checklist, and scanning the same photo twice doesn't add them twice.
+- **AI Scan:** a scan adds tasks to the checklist, most urgent first, each with where it is in the photo and how to fix it; low-confidence guesses are dropped; scanning the same photo twice doesn't add them twice.
 - **Organizations and help:** the full flow (ask, match, accept, contact revealed only to the accepting group, done), verification needing the admin token, and sign-up checks.
 
 Browser tests (Playwright) click through the whole web app in light and dark mode: onboarding, plan, checklist, help, report with photo, news, and a second place in Spanish.
@@ -195,4 +196,5 @@ python -m unittest discover tests -v
 ## Change log
 - **Oct 23, 2026:** Python API, database, risk engine, checklist rules, AI translation with guardrail, help finder, news, neighbor reports, web app, and 20 tests.
 - **Oct 23, 2026:** Renamed to Swell. Added the farmer role, drought plans for South Asia and other El Niño regions, AI Scan, organizations and help requests. 26 tests.
+- **Oct 23, 2026:** Stronger AI Scan: Gemini Pro first, an inspector's checklist for flood or drought and home or farm, up to 8 findings with where, why, fix and effort, low-confidence findings dropped, plus what's already done right and one more photo to take.
 - **Oct 23, 2026:** iPhone app caught up with the web app: home or farm, farm details, AI Scan, region card, ask for help, and the organization dashboard.

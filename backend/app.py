@@ -451,7 +451,8 @@ def scan_photo(plan_id):
     added = [f for f in result["findings"] if f["id"] not in have]
     items = added + items
     db.execute("UPDATE plans SET checklist = ?, updated_at = ? WHERE id = ?", (json.dumps(items), now_iso(), plan_id))
-    return jsonify({"seen": result["seen"], "added": added, "plan": plan_payload(plan_id)})
+    return jsonify({"seen": result["seen"], "added": added, "good": result["good"],
+                    "next_photo": result["next_photo"], "plan": plan_payload(plan_id)})
 
 
 # ---------------- organizations and help requests

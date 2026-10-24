@@ -324,6 +324,16 @@ struct ScanSheet: View {
                             Text("Added \(result.added.count) to the top of your checklist").font(.headline)
                             ForEach(result.added) { t in TaskRow(task: t) }
                         }
+                        if let good = result.good, !good.isEmpty {
+                            Text("Already done right").font(.headline)
+                            ForEach(good, id: \.self) { g in
+                                Label(g, systemImage: "checkmark.circle").font(.subheadline)
+                            }
+                        }
+                        if let next = result.nextPhoto, !next.isEmpty {
+                            Label("Next, take a photo of: \(next)", systemImage: "camera")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
                     } else {
                         Text("Point your camera at the outside of your home, a drain, your roof gutters, a water tank or a field. AI looks for risks you can see and turns them into checklist steps.")
                             .foregroundStyle(.secondary)
