@@ -36,8 +36,8 @@
     },
     "facts": [
       {
-        "big": "28",
-        "text": "El Niño winters since 1950",
+        "big": "22",
+        "text": "El Niño events from 1950 to 2024",
         "source": "NOAA Oceanic Niño Index"
       },
       {
@@ -59,47 +59,47 @@
     "history": [
       {
         "season": "1957–58",
-        "peak": 1.81,
+        "peak": 1.69,
         "strength": "strong"
       },
       {
         "season": "1965–66",
-        "peak": 1.98,
+        "peak": 1.82,
         "strength": "strong"
       },
       {
         "season": "1972–73",
-        "peak": 2.12,
+        "peak": 1.84,
         "strength": "strong"
       },
       {
         "season": "1982–83",
-        "peak": 2.23,
+        "peak": 2.14,
         "strength": "very strong"
       },
       {
-        "season": "1987–88",
-        "peak": 1.7,
-        "strength": "strong"
-      },
-      {
         "season": "1991–92",
-        "peak": 1.71,
+        "peak": 1.54,
         "strength": "strong"
       },
       {
         "season": "1997–98",
-        "peak": 2.4,
+        "peak": 2.37,
         "strength": "very strong"
       },
       {
+        "season": "2009–10",
+        "peak": 1.5,
+        "strength": "strong"
+      },
+      {
         "season": "2015–16",
-        "peak": 2.75,
+        "peak": 2.59,
         "strength": "very strong"
       },
       {
         "season": "2023–24",
-        "peak": 2.06,
+        "peak": 1.99,
         "strength": "strong"
       }
     ],
