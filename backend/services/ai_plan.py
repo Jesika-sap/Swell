@@ -45,6 +45,11 @@ Reply with ONLY JSON: {{"summary": "...", "items": [{{"id": "...", "title": "...
 
 def fallback_summary(risk, place):
     top = next((f for f in risk["factors"] if f["points"] > 0 and f["key"] != "el_nino"), None)
-    lead = {"high": "Your storm risk is high.", "elevated": "Your storm risk is elevated.", "lower": "Your storm risk is lower than many places, but El Niño storms can still cut power and close roads."}[risk["level"]]
+    if risk.get("hazard") == "drought":
+        lead = {"high": "Your drought risk is high.", "elevated": "Your drought risk is elevated.",
+                "lower": "Your drought risk is lower than many places, but El Niño can still bring a late or weak monsoon."}[risk["level"]]
+    else:
+        lead = {"high": "Your storm risk is high.", "elevated": "Your storm risk is elevated.",
+                "lower": "Your storm risk is lower than many places, but El Niño storms can still cut power and close roads."}[risk["level"]]
     why = f" The biggest reason: {top['label'].lower()}." if top else ""
     return f"{lead}{why} Start with the tasks marked first, and sign up for emergency alerts today."

@@ -85,7 +85,7 @@ input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--sea) 40%
 /* ============ onboarding ============ */
 .onboard { min-height: 100%; background: var(--bg); }
 .ob-step { max-width: 520px; margin: 0 auto; padding: 0 0 40px; }
-.ob-step[data-step="2"], .ob-step[data-step="3"], .ob-step[data-step="9"] { padding: calc(14px + env(safe-area-inset-top)) 18px 40px; }
+.ob-step[data-step="2"], .ob-step[data-step="3"], .ob-step[data-step="4"], .ob-step[data-step="5"], .ob-step[data-step="9"] { padding: calc(14px + env(safe-area-inset-top)) 18px 40px; }
 .ob-hero { position: relative; overflow: hidden; isolation: isolate; color: #fff; background: linear-gradient(165deg, var(--ocean) 0%, var(--ocean-2) 100%); padding: calc(28px + env(safe-area-inset-top)) 22px 64px; border-radius: 0 0 28px 28px; }
 .ob-hero h1 { font-size: 32px; font-weight: 800; margin: 18px 0 10px; letter-spacing: -.03em; }
 .ob-lead { color: rgba(255,255,255,.85); font-size: 16.5px; max-width: 40ch; }
