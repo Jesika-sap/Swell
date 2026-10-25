@@ -1173,7 +1173,10 @@ function trPass() {
     if (tr) { if (el.dataset.trPh == null) el.dataset.trPh = orig; el.placeholder = tr; TR.nodes.add(el); }
     else if (!TR.asked.has(lang + '|' + key)) want.add(key);
   });
-  if (want.size && !TR.inflight) trFetch(lang, [...want]);  // one request at a time; the rest goes in the next one
+  // Languages with built-in translations don't ask the AI for leftovers (mostly names and dates),
+  // so Gemini's free limit is saved for what only it can do: personal plans, AI Scan and news.
+  const hasBundle = Object.keys(TR.bundle[lang] || {}).length > 0;
+  if (want.size && !TR.inflight && !hasBundle) trFetch(lang, [...want]);  // one request at a time; the rest goes in the next one
 }
 async function trFetch(lang, texts) {
   texts = texts.slice(0, 400);
