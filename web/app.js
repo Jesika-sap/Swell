@@ -1116,7 +1116,11 @@ function trLookup(lang, key, depth = 0) {
     t.names.forEach((n, i) => {
       const part = m[i + 1];
       const cap = part.charAt(0).toUpperCase() + part.slice(1);
-      let tr = trLookup(lang, part, depth + 1) || trLookup(lang, cap, depth + 1);
+      let tr = trLookup(lang, part, depth + 1);
+      if (!tr && part !== cap) {  // "flood zone" -> translate "Flood zone", keep it lowercase mid-sentence
+        tr = trLookup(lang, cap, depth + 1);
+        if (tr) tr = tr.charAt(0).toLocaleLowerCase(lang) + tr.slice(1);
+      }
       if (!tr) {  // e.g. "Saturday 2 PM": translate the day name and keep the time
         const b = TR.bundle[lang] || {};
         tr = part.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)( Night)?\b/g, (w) => b[w] || w);
