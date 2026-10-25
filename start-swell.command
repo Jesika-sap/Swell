@@ -36,13 +36,18 @@ export GEMINI_API_KEY
 
 # Check the key with Google before starting.
 if [ -n "$GEMINI_API_KEY" ]; then
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "x-goog-api-key: $GEMINI_API_KEY" \
+  RESP=$(curl -s -w "\n%{http_code}" -H "x-goog-api-key: $GEMINI_API_KEY" \
     "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1")
+  CODE="$(echo "$RESP" | tail -n1)"
   if [ "$CODE" = "200" ]; then
     echo "AI is ON (Gemini key works, ends in ...${GEMINI_API_KEY: -4})."
   else
     echo ""
     echo "Google didn't accept that Gemini key (error $CODE). Swell will run, but AI Scan and translation won't work."
+    MSG="$(echo "$RESP" | grep -m1 '"message"' | sed 's/.*"message": *"//; s/",* *$//')"
+    [ -n "$MSG" ] && echo "Google says: $MSG"
+    case "$GEMINI_API_KEY" in AIza*) ;; *) echo "Note: Gemini keys start with AIza. The one saved here starts with ${GEMINI_API_KEY:0:4}, so it may not be the key.";; esac
+    echo "Saved key is ${#GEMINI_API_KEY} characters long (a real one is 39)."
     echo "To fix it: copy the key again from aistudio.google.com/apikey, then run:  ./start-swell.command --new-key"
   fi
 else
