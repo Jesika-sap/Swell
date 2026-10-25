@@ -44,24 +44,25 @@ class RetiredModels(unittest.TestCase):
 
 
 class TooManyRequests(unittest.TestCase):
-    def test_waits_and_tries_again(self):
+    def test_rests_after_quota_is_used_up(self):
         calls = []
 
         def fake(method, url, **kw):
             calls.append(url)
-            if len(calls) == 1:
-                return 429, {}
-            return 200, {"candidates": [{"content": {"parts": [{"text": "ok"}]}}]}
+            return 429, {}
         old_fake, http.fake = http.fake, fake
         old_key, config.GEMINI_API_KEY = config.GEMINI_API_KEY, "AIzaTEST"
-        old_sleep, gemini.time.sleep = gemini.time.sleep, lambda s: None
-        gemini._good = None
+        gemini._good, gemini._live, gemini._cool_until = None, [], 0
         try:
-            self.assertEqual(gemini.generate([{"text": "hi"}])[0], "ok")
-            self.assertEqual(len(calls), 2)
-            self.assertEqual(calls[0], calls[1])  # same model, tried again
+            with self.assertRaises(http.ServiceError):
+                gemini.generate([{"text": "hi"}])
+            n = len(calls)
+            with self.assertRaises(http.ServiceError):
+                gemini.generate([{"text": "hi"}])
+            self.assertEqual(len(calls), n)  # resting: no new calls to Google
         finally:
-            http.fake, config.GEMINI_API_KEY, gemini.time.sleep = old_fake, old_key, old_sleep
+            http.fake, config.GEMINI_API_KEY = old_fake, old_key
+            gemini._cool_until, gemini._live = 0, None
 
 
 if __name__ == "__main__":

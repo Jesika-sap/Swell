@@ -20,6 +20,7 @@ BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
 AI_TIMEOUT = 90  # seconds; translating a whole checklist can take a while
 _good = None     # the last model that answered, tried first next time
+_cool_until = 0  # when Google says the free quota is used up, rest instead of asking again and again
 
 
 def available():
@@ -79,6 +80,9 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=No
     if search:
         body["tools"] = [{"google_search": {}}]
     headers = {"x-goog-api-key": config.GEMINI_API_KEY}
+    global _cool_until
+    if time.time() < _cool_until:
+        raise ServiceError("Gemini's free limit is used up for now (Google answered 429). Swell will try again in a few minutes.")
     last, tried = None, []
 
     def attempt(model):
@@ -86,17 +90,11 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=No
         global _good
         tried.append(model)
         try:
-            try:
-                data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=AI_TIMEOUT)
-            except ServiceError as e:
-                if "429" not in str(e):
-                    raise
-                print(f"[Swell] {model}: Google says too many requests, waiting 8 seconds...", flush=True)
-                time.sleep(8)  # the free plan allows only a few calls a minute
-                data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=AI_TIMEOUT)
+            data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=AI_TIMEOUT)
         except ServiceError as e:
             last = e
-            print(f"[Swell] {model}: {e}", flush=True)
+            if "404" not in str(e):
+                print(f"[Swell] {model}: {e}", flush=True)
             if model == _good:
                 _good = None
             return None
@@ -119,6 +117,10 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=No
             got = attempt(model)
             if got:
                 return got
+    if last and "429" in str(last):
+        _cool_until = time.time() + 300
+        print("[Swell] Gemini's free limit is used up for now (429 from every model). Resting 5 minutes. "
+              "Screen text still shows in your language from Swell's built-in translations.", flush=True)
     if last and tried:
         last = ServiceError(f"{last} (tried {', '.join(tried)})")
     raise last or ServiceError("AI unavailable")

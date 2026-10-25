@@ -1084,7 +1084,42 @@ $('#refreshBtn').addEventListener('click', async () => {
    else on screen (buttons, headings, weather, risk reasons, tabs) is translated
    here: we collect the English text on screen, ask the server once per phrase,
    and remember the answers on this device. Names and numbers stay as they are. */
-const TR = { lang: 'en', mem: {}, asked: new Set(), tries: {}, nodes: new Set(), timer: null, inflight: 0 };
+const TR = { lang: 'en', mem: {}, asked: new Set(), tries: {}, nodes: new Set(), timer: null, inflight: 0, bundle: {}, tpl: {} };
+// Built-in translations (web/i18n/<lang>.json), written ahead of time so the
+// whole screen switches instantly, even offline or when the AI is busy.
+function trBundle(lang) {
+  if (TR.bundle[lang] !== undefined) return TR.bundle[lang];
+  TR.bundle[lang] = null;  // loading
+  fetch(`i18n/${lang}.json`).then((r) => (r.ok ? r.json() : {})).catch(() => ({})).then((b) => {
+    TR.bundle[lang] = b || {};
+    TR.tpl[lang] = Object.keys(TR.bundle[lang]).filter((k) => k.includes('{0}')).map((k) => {
+      const names = [];
+      const re = new RegExp('^' + k.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{(\d)\}/g, (m, n) => { names.push(+n); return '(.+?)'; }) + '$');
+      return { re, names, out: TR.bundle[lang][k] };
+    });
+    trSchedule();
+  });
+  return null;
+}
+function trLookup(lang, key, depth = 0) {
+  const mem = trMem(lang), b = TR.bundle[lang] || {};
+  if (b[key]) return b[key];
+  if (mem[key]) return mem[key];
+  if (depth > 1) return null;
+  for (const t of TR.tpl[lang] || []) {
+    const m = key.match(t.re);
+    if (!m) continue;
+    let out = t.out;
+    t.names.forEach((n, i) => {
+      const part = m[i + 1];
+      const cap = part.charAt(0).toUpperCase() + part.slice(1);
+      const tr = trLookup(lang, part, depth + 1) || trLookup(lang, cap, depth + 1) || part;
+      out = out.split('{' + n + '}').join(tr);
+    });
+    return out;
+  }
+  return null;
+}
 const TR_SKIP = 'script,style,textarea,input,select,option,code,.keybox,.leaflet-control-attribution,#trBadge,[data-no-tr]';
 function uiLang() { return (plan && plan.language) || state.language || 'en'; }
 function trMem(lang) {
@@ -1111,7 +1146,8 @@ function trPass() {
   const lang = uiLang();
   if (lang !== TR.lang) { trRestore(); TR.lang = lang; document.documentElement.lang = lang; }
   if (lang === 'en') return;
-  const mem = trMem(lang), want = new Set();
+  if (trBundle(lang) === null) return;  // wait for the built-in translations to load
+  const want = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     if (n.__trOut != null && n.nodeValue === n.__trOut) continue;          // already done
@@ -1119,13 +1155,15 @@ function trPass() {
     if (!/[A-Za-z]{2}/.test(key) || key.length > 600) continue;
     const el = n.parentElement;
     if (!el || el.closest(TR_SKIP)) continue;
-    if (mem[key]) { n.__trOrig = orig; n.__trOut = orig.replace(key, mem[key]); n.nodeValue = n.__trOut; TR.nodes.add(n); }
+    const tr = trLookup(lang, key);
+    if (tr) { n.__trOrig = orig; n.__trOut = orig.replace(key, tr); n.nodeValue = n.__trOut; TR.nodes.add(n); }
     else if (!TR.asked.has(lang + '|' + key)) want.add(key);
   }
   document.querySelectorAll('[placeholder]').forEach((el) => {
     const orig = el.dataset.trPh != null ? el.dataset.trPh : el.placeholder, key = (orig || '').trim();
     if (!/[A-Za-z]{2}/.test(key) || el.closest('[data-no-tr]')) return;
-    if (mem[key]) { if (el.dataset.trPh == null) el.dataset.trPh = orig; el.placeholder = mem[key]; TR.nodes.add(el); }
+    const tr = trLookup(lang, key);
+    if (tr) { if (el.dataset.trPh == null) el.dataset.trPh = orig; el.placeholder = tr; TR.nodes.add(el); }
     else if (!TR.asked.has(lang + '|' + key)) want.add(key);
   });
   if (want.size && !TR.inflight) trFetch(lang, [...want]);  // one request at a time; the rest goes in the next one
