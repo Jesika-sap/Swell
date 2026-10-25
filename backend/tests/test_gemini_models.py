@@ -43,5 +43,26 @@ class RetiredModels(unittest.TestCase):
         self.assertNotIn("gemini-3.5-flash-image", gemini.live_models())
 
 
+class TooManyRequests(unittest.TestCase):
+    def test_waits_and_tries_again(self):
+        calls = []
+
+        def fake(method, url, **kw):
+            calls.append(url)
+            if len(calls) == 1:
+                return 429, {}
+            return 200, {"candidates": [{"content": {"parts": [{"text": "ok"}]}}]}
+        old_fake, http.fake = http.fake, fake
+        old_key, config.GEMINI_API_KEY = config.GEMINI_API_KEY, "AIzaTEST"
+        old_sleep, gemini.time.sleep = gemini.time.sleep, lambda s: None
+        gemini._good = None
+        try:
+            self.assertEqual(gemini.generate([{"text": "hi"}])[0], "ok")
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0], calls[1])  # same model, tried again
+        finally:
+            http.fake, config.GEMINI_API_KEY, gemini.time.sleep = old_fake, old_key, old_sleep
+
+
 if __name__ == "__main__":
     unittest.main()

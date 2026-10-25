@@ -1128,7 +1128,7 @@ function trPass() {
     if (mem[key]) { if (el.dataset.trPh == null) el.dataset.trPh = orig; el.placeholder = mem[key]; TR.nodes.add(el); }
     else if (!TR.asked.has(lang + '|' + key)) want.add(key);
   });
-  if (want.size) trFetch(lang, [...want]);
+  if (want.size && !TR.inflight) trFetch(lang, [...want]);  // one request at a time; the rest goes in the next one
 }
 async function trFetch(lang, texts) {
   texts = texts.slice(0, 400);
@@ -1144,7 +1144,7 @@ async function trFetch(lang, texts) {
   TR.inflight--; trBadge();
   // Anything that didn't come back gets tried again (up to 4 times), so nothing stays English for good.
   const missed = texts.filter((t) => !got[t] && (TR.tries[lang + '|' + t] = (TR.tries[lang + '|' + t] || 0) + 1) < 4);
-  if (missed.length) setTimeout(() => { missed.forEach((t) => TR.asked.delete(lang + '|' + t)); trSchedule(); }, 8000);
+  if (missed.length) setTimeout(() => { missed.forEach((t) => TR.asked.delete(lang + '|' + t)); trSchedule(); }, 15000);
   trSchedule();
 }
 function trBadge() {

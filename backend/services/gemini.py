@@ -11,6 +11,7 @@ If the first model is busy or retired, we fall back to the next one.
 """
 import json
 import re
+import time
 
 import config
 from services.http import get_json, post_json, ServiceError
@@ -85,7 +86,14 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=No
         global _good
         tried.append(model)
         try:
-            data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=AI_TIMEOUT)
+            try:
+                data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=AI_TIMEOUT)
+            except ServiceError as e:
+                if "429" not in str(e):
+                    raise
+                print(f"[Swell] {model}: Google says too many requests, waiting 8 seconds...", flush=True)
+                time.sleep(8)  # the free plan allows only a few calls a minute
+                data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=AI_TIMEOUT)
         except ServiceError as e:
             last = e
             print(f"[Swell] {model}: {e}", flush=True)

@@ -6,14 +6,16 @@ the first time a screen appears in Nepali it loads instantly for everyone.
 """
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor
+import threading
 
 import db
 from services import gemini
 from services.http import ServiceError
 
 TTL = 60 * 24 * 3600
-CHUNK = 25  # phrases per AI call; several calls run at once
+CHUNK = 120  # phrases per AI call. Calls go one at a time: Gemini's free plan
+             # only allows a few calls a minute, and a burst of them gets refused.
+_lock = threading.Lock()
 
 
 def _key(lang, text):
@@ -31,6 +33,11 @@ Phrases (JSON, keyed by number): {json.dumps(numbered, ensure_ascii=False)}
 Reply with ONLY JSON with the same keys: {{"0": "...", "1": "..."}}"""
     text, _ = gemini.generate([{"text": prompt}], json_mode=True, temperature=0.1)
     data = gemini.parse_json(text)
+    if isinstance(data, list):  # some models answer with a plain list
+        data = {str(i): v for i, v in enumerate(data)}
+    if isinstance(data, dict) and isinstance(data.get("translations"), (dict, list)):
+        inner = data["translations"]
+        data = inner if isinstance(inner, dict) else {str(i): v for i, v in enumerate(inner)}
     out = {}
     for i, t in enumerate(texts):
         v = data.get(str(i)) if isinstance(data, dict) else None
@@ -41,25 +48,37 @@ Reply with ONLY JSON with the same keys: {{"0": "...", "1": "..."}}"""
 
 def translate(texts, lang, lang_name):
     """Returns ({english: translated}, failed). Missing phrases stay English."""
-    found, todo = {}, []
-    for t in texts:
-        hit = db.cache_get(_key(lang, t))
-        if hit is not None:
-            found[t] = hit
-        elif t not in todo:
-            todo.append(t)
+    found = {}
+
+    def from_cache():
+        todo = []
+        for t in texts:
+            if t in found:
+                continue
+            hit = db.cache_get(_key(lang, t))
+            if hit is not None:
+                found[t] = hit
+            elif t not in todo:
+                todo.append(t)
+        return todo
+
+    todo = from_cache()
     failed = False
     if todo:
-        chunks = [todo[i:i + CHUNK] for i in range(0, len(todo), CHUNK)]
-        print(f"[Swell] Translating {len(todo)} bits of screen text into {lang_name.split(',')[0]}...", flush=True)
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            for res in pool.map(lambda c: _safe(lang_name, c), chunks):
+        with _lock:  # one AI call at a time, even if several screens ask at once
+            todo = from_cache()  # another request may have just translated some of these
+            if todo:
+                print(f"[Swell] Translating {len(todo)} bits of screen text into {lang_name.split(',')[0]}...", flush=True)
+            for i in range(0, len(todo), CHUNK):
+                res = _safe(lang_name, todo[i:i + CHUNK])
                 if res is None:
                     failed = True
                     continue
                 for en, tr in res.items():
                     db.cache_set(_key(lang, en), tr, TTL)
                     found[en] = tr
+            if todo and not failed:
+                print(f"[Swell] Screen text translated ({len(found)} bits).", flush=True)
     return found, failed
 
 
