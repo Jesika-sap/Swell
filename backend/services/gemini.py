@@ -13,7 +13,7 @@ import json
 import re
 
 import config
-from services.http import post_json, ServiceError
+from services.http import get_json, post_json, ServiceError
 
 BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
@@ -21,6 +21,38 @@ FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-
 
 def available():
     return bool(config.GEMINI_API_KEY)
+
+
+_live = None  # models this key can actually use, asked from Google once
+
+
+def _version(name):
+    m = re.search(r"gemini-(\d+(?:\.\d+)?)", name)
+    return float(m.group(1)) if m else 0.0
+
+
+def live_models():
+    """Ask Google which Flash models this key can use right now. Google retires
+    model names over time; this keeps translation working when that happens."""
+    global _live
+    if _live is not None:
+        return _live
+    try:
+        data = get_json(f"{BASE}?pageSize=1000", headers={"x-goog-api-key": config.GEMINI_API_KEY})
+    except ServiceError:
+        return []  # try again next time
+    names = []
+    for m in data.get("models", []) or []:
+        name = (m.get("name") or "").split("/")[-1]
+        if "generateContent" not in (m.get("supportedGenerationMethods") or []):
+            continue
+        if "flash" not in name or re.search(r"image|tts|audio|live|embed|robotics|computer|thinking", name):
+            continue
+        names.append(name)
+    unstable = lambda n: bool(re.search(r"preview|exp", n))
+    names.sort(key=lambda n: ("lite" in n, unstable(n), -_version(n), n))
+    _live = names[:4]
+    return _live
 
 
 def _models(first=None):
@@ -44,18 +76,35 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=No
     if search:
         body["tools"] = [{"google_search": {}}]
     headers = {"x-goog-api-key": config.GEMINI_API_KEY}
-    last = None
-    for model in _models(models):
+    last, tried = None, []
+
+    def attempt(model):
+        nonlocal last
+        tried.append(model)
         try:
             data = post_json(f"{BASE}/{model}:generateContent", body, headers)
         except ServiceError as e:
             last = e
-            continue
+            return None
         cand = (data.get("candidates") or [{}])[0]
         text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
         if text.strip():
             return text, cand.get("groundingMetadata") or {}
         last = ServiceError("AI returned an empty answer")
+        return None
+
+    for model in _models(models):
+        got = attempt(model)
+        if got:
+            return got
+    # Every name we know failed (often because Google retired it): use what Google lists today.
+    for model in live_models():
+        if model not in tried:
+            got = attempt(model)
+            if got:
+                return got
+    if last and tried:
+        last = ServiceError(f"{last} (tried {', '.join(tried)})")
     raise last or ServiceError("AI unavailable")
 
 

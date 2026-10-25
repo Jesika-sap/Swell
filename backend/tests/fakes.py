@@ -86,6 +86,8 @@ def fake(method, url, **kw):
         lat = float(params["y"])
         return 200, {"value": "6.2" if lat < 37.57 else "48.0"}
 
+    if "generativelanguage.googleapis.com" in url and method == "GET":
+        return 200, {"models": [{"name": "models/gemini-flash-latest", "supportedGenerationMethods": ["generateContent"]}]}
     if "generativelanguage.googleapis.com" in url:
         body = kw.get("json") or {}
         prompt = body["contents"][0]["parts"][0]["text"]
