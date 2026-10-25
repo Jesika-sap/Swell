@@ -236,7 +236,7 @@ function renderPlan() {
       <p class="risk-summary">${esc(plan.summary)}</p>
       <label class="lang-pick">${icon('globe')}<span class="sr-only">Plan language</span>
         <select id="planLang">${LANGS.map(([k, v]) => `<option value="${k}" ${k === (plan.language || 'en') ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
-      ${plan.language && plan.language !== 'en' && (plan.missing || []).includes('ai') ? `<span class="risk-lang">Couldn’t translate this plan right now, so it’s in English. Pick the language again in a minute.</span>` : ''}
+      ${plan.language && plan.language !== 'en' && (plan.missing || []).includes('ai') ? `<span class="risk-lang">This plan isn’t translated yet, so it’s in English. <button type="button" class="link-btn" id="retryLang">Translate now</button></span>` : ''}
     </section>
 
     ${intl ? (reg ? `<section class="card region-card block"><p class="eyebrow">What El Niño usually does here</p><h3>${esc(reg.name)}</h3><span class="effect ${/wet/.test(reg.effect) ? 'eff-wet' : 'eff-dry'}">${esc(reg.effect)} · ${esc(reg.season)}</span><p class="small" style="margin:0">Live alerts and flood maps are U.S.-only for now. Follow your national weather office for warnings.</p></section>` : '')
@@ -284,13 +284,15 @@ function renderPlan() {
   requestAnimationFrame(() => $$('.gauge .val', page).forEach((c) => { c.style.strokeDashoffset = c.dataset.target; }));
   bindTasks(page);
   $$('[data-go]', page).forEach((b) => b.addEventListener('click', () => switchView(b.dataset.go)));
-  $('#planLang').addEventListener('change', async (e) => {
-    const lang = e.target.value, sel = e.target;
-    sel.disabled = true;
-    toast(lang === 'en' ? 'Switching to English…' : 'Translating your plan…');
+  const switchLang = async (lang) => {
+    const sel = $('#planLang'), retry = $('#retryLang');
+    sel.disabled = true; if (retry) retry.disabled = true;
+    toast(lang === 'en' ? 'Switching to English…' : 'Translating your plan… (about 15 seconds)');
     try { const p = await api(`/api/plan/${plan.id}/language`, { method: 'POST', body: { language: lang } }); state.language = lang; save(); setPlan(p); toast('Done.'); }
-    catch (err) { sel.disabled = false; sel.value = plan.language || 'en'; toast(err.message); }
-  });
+    catch (err) { sel.disabled = false; if (retry) retry.disabled = false; sel.value = plan.language || 'en'; toast(err.message); }
+  };
+  $('#planLang').addEventListener('change', (e) => switchLang(e.target.value));
+  if ($('#retryLang')) $('#retryLang').addEventListener('click', () => switchLang(plan.language));
   $('#scanBtn').addEventListener('click', openScan);
 }
 
@@ -993,10 +995,25 @@ $('#placeBtn').addEventListener('click', async () => {
   $('#addPlace').addEventListener('click', () => { closeSheet(); $('#addrInput').value = ''; $('#labelInput').value = ''; Object.keys(household).forEach((k) => { household[k] = false; }); $$('[data-hh]').forEach((b) => b.setAttribute('aria-pressed', 'false')); farm.grows = []; farm.workers = false; farm.creek = false; $$('[data-grow],[data-farm]').forEach((b) => b.setAttribute('aria-pressed', 'false')); showOnboard(2); });
   try {
     const list = await api('/api/plans');
-    $('#plansList').innerHTML = list.map((p) => `<li><button type="button" data-plan="${p.id}" class="${p.id === state.current ? 'cur' : ''}"><span><strong>${esc(p.label)}</strong><small>${esc([p.city, p.state].filter(Boolean).join(', '))}</small></span><span class="risk-level lv-${p.level}">${p.score}</span></button></li>`).join('');
+    $('#plansList').innerHTML = list.map((p) => `<li class="plan-row"><button type="button" data-plan="${p.id}" class="${p.id === state.current ? 'cur' : ''}"><span><strong>${esc(p.label)}</strong><small>${esc([p.city, p.state].filter(Boolean).join(', '))}</small></span><span class="risk-level lv-${p.level}">${p.score}</span></button><button type="button" class="del-plan" data-del="${p.id}" aria-label="Delete ${esc(p.label)}">Delete</button></li>`).join('');
     $$('[data-plan]').forEach((b) => b.addEventListener('click', async () => {
       closeSheet();
       try { setPlan(await api(`/api/plan/${b.dataset.plan}`)); newsCache = null; switchView('plan'); } catch (e) { toast(e.message); }
+    }));
+    $$('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+      if (!b.classList.contains('sure')) { b.classList.add('sure'); b.textContent = 'Sure?'; setTimeout(() => { b.classList.remove('sure'); b.textContent = 'Delete'; }, 4000); return; }
+      const id = b.dataset.del;
+      b.disabled = true;
+      try {
+        await api(`/api/plan/${id}`, { method: 'DELETE' });
+        b.closest('li').remove();
+        toast('Place deleted.');
+        if (id === state.current) {
+          const rest = $$('[data-plan]');
+          if (rest.length) { closeSheet(); setPlan(await api(`/api/plan/${rest[0].dataset.plan}`)); newsCache = null; switchView('plan'); }
+          else { closeSheet(); state.current = null; state.cached = null; save(); plan = null; showOnboard(1); }
+        }
+      } catch (e) { b.disabled = false; toast(e.message); }
     }));
   } catch (e) { $('#plansList').innerHTML = `<li class="notice">${esc(e.message)}</li>`; }
 });

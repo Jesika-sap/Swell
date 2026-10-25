@@ -163,6 +163,7 @@ main { position: fixed; top: calc(var(--topbar-h) + env(safe-area-inset-top)); b
 .risk-place { color: rgba(255,255,255,.75); font-size: 14px; margin: 3px 0 0; }
 .risk-summary { margin: 14px 0 0; color: rgba(255,255,255,.92); font-size: 15.5px; line-height: 1.5; }
 .risk-lang { display: inline-block; margin-top: 10px; font-size: 12px; color: rgba(255,255,255,.7); }
+.risk-lang .link-btn { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: #fff; text-decoration: underline; cursor: pointer; }
 
 .alert { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 14px; border-radius: 16px; margin-top: 14px; border: 1.5px solid; }
 .alert svg { width: 24px; height: 24px; margin-top: 2px; }
@@ -300,6 +301,9 @@ main { position: fixed; top: calc(var(--topbar-h) + env(safe-area-inset-top)); b
 .plans-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
 .plans-list button { width: 100%; text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface); font: inherit; color: var(--ink); cursor: pointer; }
 .plans-list button.cur { border-color: var(--sea); background: var(--sea-soft); }
+.plans-list .plan-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.plans-list .del-plan { width: auto; display: block; padding: 0 14px; font-size: 14px; font-weight: 700; color: #B3261E; border-color: var(--line); text-align: center; }
+.plans-list .del-plan.sure { background: #B3261E; color: #fff; border-color: #B3261E; }
 .plans-list small { display: block; color: var(--muted); font-size: 13px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom)); z-index: 3000; background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 12px; font-weight: 600; font-size: 14.5px; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
 .spinner { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; display: inline-block; }
