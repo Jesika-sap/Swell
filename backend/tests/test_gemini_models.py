@@ -13,6 +13,7 @@ class RetiredModels(unittest.TestCase):
     def setUp(self):
         self.calls = []
         gemini._live = None
+        gemini._good = None
         self.old_key, config.GEMINI_API_KEY = config.GEMINI_API_KEY, "AIzaTEST"
 
         def fake(method, url, **kw):
@@ -33,6 +34,7 @@ class RetiredModels(unittest.TestCase):
         http.fake = self.old_fake
         config.GEMINI_API_KEY = self.old_key
         gemini._live = None
+        gemini._good = None
 
     def test_uses_a_model_google_still_lists(self):
         text, _ = gemini.generate([{"text": "hi"}])

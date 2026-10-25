@@ -17,6 +17,8 @@ from services.http import get_json, post_json, ServiceError
 
 BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+AI_TIMEOUT = 90  # seconds; translating a whole checklist can take a while
+_good = None     # the last model that answered, tried first next time
 
 
 def available():
@@ -57,7 +59,7 @@ def live_models():
 
 def _models(first=None):
     out = []
-    for m in list(first or []) + [config.GEMINI_MODEL] + FALLBACK_MODELS:
+    for m in list(first or []) + ([_good] if _good else []) + [config.GEMINI_MODEL] + FALLBACK_MODELS:
         if m not in out:
             out.append(m)
     return out
@@ -80,17 +82,23 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=No
 
     def attempt(model):
         nonlocal last
+        global _good
         tried.append(model)
         try:
-            data = post_json(f"{BASE}/{model}:generateContent", body, headers)
+            data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=AI_TIMEOUT)
         except ServiceError as e:
             last = e
+            print(f"[Swell] {model}: {e}", flush=True)
+            if model == _good:
+                _good = None
             return None
         cand = (data.get("candidates") or [{}])[0]
         text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
         if text.strip():
+            _good = model
             return text, cand.get("groundingMetadata") or {}
         last = ServiceError("AI returned an empty answer")
+        print(f"[Swell] {model}: empty answer", flush=True)
         return None
 
     for model in _models(models):

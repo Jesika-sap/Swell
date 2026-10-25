@@ -22,12 +22,16 @@ fake = None
 
 def _do(method, url, **kw):
     if fake is not None:
+        kw.pop("timeout", None)
         status, data = fake(method, url, **kw)
         if status >= 400:
             raise ServiceError(f"{url.split('/')[2]} answered {status}")
         return data
     try:
-        r = _session.request(method, url, timeout=config.HTTP_TIMEOUT, **kw)
+        timeout = kw.pop("timeout", None) or config.HTTP_TIMEOUT
+        r = _session.request(method, url, timeout=timeout, **kw)
+    except requests.Timeout as e:
+        raise ServiceError(f"{url.split('/')[2]} took too long to answer") from e
     except requests.RequestException as e:
         raise ServiceError(f"could not reach {url.split('/')[2]}") from e
     if r.status_code >= 400:
@@ -42,5 +46,5 @@ def get_json(url, params=None, headers=None):
     return _do("GET", url, params=params, headers=headers)
 
 
-def post_json(url, body, headers=None):
-    return _do("POST", url, json=body, headers=headers)
+def post_json(url, body, headers=None, timeout=None):
+    return _do("POST", url, json=body, headers=headers, timeout=timeout)
