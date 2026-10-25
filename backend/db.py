@@ -87,6 +87,9 @@ def _migrate():
     """Add columns that older databases don't have yet."""
     if "community_id" not in _columns("reports"):
         execute("ALTER TABLE reports ADD COLUMN community_id TEXT")
+    for table in ("accounts", "orgs"):
+        if "photo" not in _columns(table):
+            execute(f"ALTER TABLE {table} ADD COLUMN photo TEXT")
 
 
 # ---------- cache helpers ----------

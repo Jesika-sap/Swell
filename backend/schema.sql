@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS orgs (
     verified      INTEGER NOT NULL DEFAULT 0,
     example       INTEGER NOT NULL DEFAULT 0,
     key_hash      TEXT NOT NULL,     -- the organization's secret key, stored only as a hash
+    photo         TEXT,              -- logo or profile picture, a small JPEG (data URL)
     created_at    TEXT NOT NULL
 );
 
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     email       TEXT NOT NULL UNIQUE,
     pw_hash     TEXT NOT NULL,
     device_id   TEXT NOT NULL UNIQUE,
+    photo       TEXT,              -- profile picture, a small JPEG (data URL)
     created_at  TEXT NOT NULL
 );
 

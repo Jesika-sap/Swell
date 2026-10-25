@@ -550,6 +550,7 @@ def org_public(o, lat=None, lon=None):
     out["services"] = json.loads(o["services"])
     out["verified"] = bool(o["verified"])
     out["example"] = bool(o["example"])
+    out["photo"] = o.get("photo")
     if lat is not None:
         out["miles"] = round(resources.miles(lat, lon, o["lat"], o["lon"]), 1)
     return out
@@ -621,6 +622,14 @@ def create_org():
     oid, key = create_org_row(d, lat, lon)
     o = db.one("SELECT * FROM orgs WHERE id = ?", (oid,))
     return jsonify({"org": org_public(o), "key": key}), 201
+
+
+@app.post("/api/orgs/<org_id>/photo")
+def set_org_photo(org_id):
+    o = own_org(org_id)
+    rate_limit("avatar", 30)
+    db.execute("UPDATE orgs SET photo = ? WHERE id = ?", (valid_avatar(body().get("photo")), o["id"]))
+    return jsonify({"org": org_public(db.one("SELECT * FROM orgs WHERE id = ?", (o["id"],)))})
 
 
 @app.post("/api/orgs/<org_id>/verify")
@@ -734,7 +743,19 @@ EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 
 
 def account_public(a):
-    return {"id": a["id"], "name": a["name"], "email": a["email"]} if a else None
+    return {"id": a["id"], "name": a["name"], "email": a["email"], "photo": a.get("photo")} if a else None
+
+
+MAX_AVATAR_CHARS = 200_000  # about 150 KB; the apps shrink pictures to 256 x 256 first
+
+
+def valid_avatar(p):
+    """A profile picture: a small square JPEG, or None to remove it."""
+    if p is None or p == "":
+        return None
+    if not isinstance(p, str) or not p.startswith("data:image/jpeg;base64,") or len(p) > MAX_AVATAR_CHARS:
+        raise BadRequest("Profile pictures must be a small JPEG. Try another photo.")
+    return p
 
 
 def current_account():
@@ -759,6 +780,14 @@ def _move_device_data(old, new):
 @app.get("/api/account")
 def get_account():
     return jsonify({"account": account_public(current_account())})
+
+
+@app.post("/api/account/photo")
+def set_account_photo():
+    a = need_account()
+    rate_limit("avatar", 30)
+    db.execute("UPDATE accounts SET photo = ? WHERE id = ?", (valid_avatar(body().get("photo")), a["id"]))
+    return jsonify({"account": account_public(db.one("SELECT * FROM accounts WHERE id = ?", (a["id"],)))})
 
 
 @app.post("/api/account/signup")
@@ -971,7 +1000,7 @@ def get_community(cid):
         out["invite_code"] = c["invite_code"]
     if c["kind"] == "family":
         people = []
-        for m in db.query("""SELECT m.role, m.safe_at, m.joined_at, ac.id, ac.name, ac.device_id FROM community_members m
+        for m in db.query("""SELECT m.role, m.safe_at, m.joined_at, ac.id, ac.name, ac.device_id, ac.photo FROM community_members m
                              JOIN accounts ac ON ac.id = m.account_id WHERE m.community_id = ? ORDER BY m.joined_at""", (cid,)):
             places = []
             for p in db.query("SELECT id, label, city, state, lat, lon, risk FROM plans WHERE device_id = ? ORDER BY created_at", (m["device_id"],)):
@@ -983,7 +1012,8 @@ def get_community(cid):
                 # Family sees roughly where each place is (about 1 km), never the exact address.
                 out.setdefault("places", []).append({"who": m["name"], "label": p["label"] or "Home",
                                                      "lat": round(p["lat"], 2), "lon": round(p["lon"], 2)})
-            people.append({"name": m["name"], "role": m["role"], "you": m["id"] == a["id"], "safe_at": m["safe_at"], "places": places})
+            people.append({"name": m["name"], "role": m["role"], "you": m["id"] == a["id"], "safe_at": m["safe_at"],
+                           "photo": m["photo"], "places": places})
         out["people"] = people
     if c["lat"] is not None:
         out["center"] = {"lat": c["lat"], "lon": c["lon"]}

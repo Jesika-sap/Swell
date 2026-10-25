@@ -421,10 +421,10 @@ async function services() {
   return SERVICES;
 }
 function orgHTML(o) {
-  return `<li class="org"><div class="org-top"><strong>${esc(o.name)}</strong>${o.example ? '<span class="badge badge-wait">Example</span>' : o.verified ? '<span class="badge badge-ok">Verified</span>' : '<span class="badge badge-wait">Not verified yet</span>'}</div>
+  return `<li class="org"><div class="org-top"><span class="org-name">${avatarHTML(o.name, o.photo, 'org-logo')}<strong>${esc(o.name)}</strong></span>${o.example ? '<span class="badge badge-wait">Example</span>' : o.verified ? '<span class="badge badge-ok">Verified</span>' : '<span class="badge badge-wait">Not verified yet</span>'}</div>
     ${o.about ? `<p>${esc(o.about)}</p>` : ''}
     <div class="svc">${o.services.map((k) => `<span>${esc((SERVICES || {})[k] || k)}</span>`).join('')}</div>
-    <p class="small">${esc(o.area || '')}${o.miles != null ? ` · ${o.miles} mi away` : ''}</p>
+    <p class="small">${esc([o.area, o.miles != null ? `${o.miles} mi away` : ''].filter(Boolean).join(' · '))}</p>
     <div class="res-actions">${o.website ? `<a href="${esc(o.website)}" target="_blank" rel="noopener">Website</a>` : ''}${o.email ? `<a href="mailto:${esc(o.email)}">Email</a>` : ''}${o.phone ? `<a href="tel:${esc(o.phone)}">Call</a>` : ''}</div></li>`;
 }
 function requestHTML(r) {
@@ -487,6 +487,7 @@ async function openOrgSignup() {
     <label class="field-label" for="oEmail">Email</label><input id="oEmail" type="text" maxlength="120">
     <label class="field-label" for="oWeb">Website <span class="opt">optional</span></label><input id="oWeb" type="text" maxlength="200">
     <label class="field-label" for="oPhone">Phone <span class="opt">optional</span></label><input id="oPhone" type="text" maxlength="40">
+    <label class="field-label" for="oLogo">Logo or picture <span class="opt">optional</span></label><input id="oLogo" type="file" accept="image/*">
     <button class="btn btn-primary btn-wide" type="button" id="oSend">Create organization</button>`);
   $$('[data-svc]').forEach((b) => b.addEventListener('click', () => { const k = b.dataset.svc; if (picked.has(k)) picked.delete(k); else picked.add(k); b.setAttribute('aria-pressed', String(picked.has(k))); }));
   $('#oSend').addEventListener('click', async () => {
@@ -494,6 +495,13 @@ async function openOrgSignup() {
     try {
       const res = await api('/api/orgs', { method: 'POST', body: { name: $('#oName').value.trim(), about: $('#oAbout').value.trim(), services: [...picked], address: $('#oAddr').value.trim() || undefined, lat: plan.lat, lon: plan.lon, radius_miles: $('#oRadius').value, email: $('#oEmail').value.trim(), website: $('#oWeb').value.trim(), phone: $('#oPhone').value.trim() } });
       state.org = { id: res.org.id, key: res.key, name: res.org.name }; save();
+      const logo = $('#oLogo').files && $('#oLogo').files[0];
+      if (logo) {
+        try {
+          const photo = await squarePhoto(logo);
+          await fetch((CFG.apiBase || '') + `/api/orgs/${res.org.id}/photo`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Org-Key': res.key }, body: JSON.stringify({ photo }) });
+        } catch (e) { toast('Organization created, but the logo didn’t upload. Add it from your dashboard.'); }
+      }
       openSheet(`<h2 id="sheetTitle">You’re on ${esc(CFG.name)}</h2><p>Save this key. It’s the only way to open your dashboard on another device.</p><div class="keybox">${esc(res.key)}</div>
         <button class="btn btn-primary btn-wide" type="button" id="toDash">Open dashboard</button>`);
       $('#toDash').addEventListener('click', () => { closeSheet(); openOrgDashboard(); });
@@ -513,12 +521,19 @@ async function openOrgDashboard() {
   } catch (e) { page.innerHTML = `<div class="notice">${esc(e.message)}</div>`; return; }
   const open = d.requests.filter((r) => r.status === 'open'), mine = d.requests.filter((r) => r.mine && r.status === 'accepted');
   page.innerHTML = `<button class="back-link" type="button" id="orgBack">← Back to my plan</button>
-    <section class="card org-hero"><p class="eyebrow" style="color:rgba(255,255,255,.7)">Organization dashboard</p><h2 style="color:#fff">${esc(d.org.name)}</h2>
+    <section class="card org-hero"><p class="eyebrow" style="color:rgba(255,255,255,.7)">Organization dashboard</p>
+      <div class="org-hero-top"><button type="button" class="avatar-btn" id="orgPhoto" aria-label="${d.org.photo ? 'Change' : 'Add'} your organization’s logo">${avatarHTML(d.org.name, d.org.photo, 'org-logo big')}<span class="avatar-edit">${d.org.photo ? 'Change' : 'Add logo'}</span></button><h2 style="color:#fff;margin:0">${esc(d.org.name)}</h2></div>
       <p>${d.org.verified ? 'Verified' : 'Not verified yet'} · helping within ${d.org.radius_miles} miles</p>
       <div class="org-stats"><div><b>${open.length}</b><span>new requests</span></div><div><b>${mine.length}</b><span>you’re helping</span></div><div><b>${d.helped}</b><span>helped so far</span></div></div></section>
     <section class="block"><div class="section-head"><h3>You’re helping</h3></div>${mine.length ? mine.map((r) => orgReqHTML(r)).join('') : '<div class="notice">Accept a request below to see the person’s contact.</div>'}</section>
     <section class="block"><div class="section-head"><h3>New requests near you</h3></div>${open.length ? open.map((r) => orgReqHTML(r)).join('') : '<div class="notice">No open requests right now.</div>'}</section>`;
   $('#orgBack').addEventListener('click', () => switchView('help'));
+  $('#orgPhoto').addEventListener('click', () => pickAvatar(async (photo) => {
+    const res = await fetch((CFG.apiBase || '') + `/api/orgs/${state.org.id}/photo`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Org-Key': state.org.key }, body: JSON.stringify({ photo }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || 'Couldn’t save the logo.');
+    openOrgDashboard();
+  }));
   $$('[data-act]', page).forEach((b) => b.addEventListener('click', async () => {
     try {
       const res = await fetch((CFG.apiBase || '') + `/api/orgs/${state.org.id}/requests/${b.dataset.id}/${b.dataset.act}`, { method: 'POST', headers: { 'X-Org-Key': state.org.key } });
@@ -693,7 +708,7 @@ async function renderCommunity() {
     return;
   }
   page.innerHTML = `
-    <div class="acct-row"><span class="small">Signed in as <strong>${esc(d.account.name)}</strong></span><button class="link-btn" type="button" id="logoutBtn">Log out</button></div>
+    <div class="acct-row"><button type="button" class="avatar-btn" id="acctPhoto" aria-label="${d.account.photo ? 'Change' : 'Add'} your profile picture">${avatarHTML(d.account.name, d.account.photo)}<span class="avatar-edit">${d.account.photo ? 'Change' : 'Add photo'}</span></button><span class="small" style="flex:1">Signed in as <strong>${esc(d.account.name)}</strong></span><button class="link-btn" type="button" id="logoutBtn">Log out</button></div>
     <h2>Community</h2>
     <p class="muted">You’re in your county and city automatically, where officials post updates. In neighborhood and family groups, everyone can post storm reports.</p>
     <section class="block"><div class="section-head"><h3>Your communities</h3></div>
@@ -707,6 +722,11 @@ async function renderCommunity() {
     </section>
     <button class="btn btn-ghost btn-wide" type="button" id="reportBtn">${icon('camera')} Report a storm problem</button>`;
   $('#logoutBtn').addEventListener('click', openLogout);
+  $('#acctPhoto').addEventListener('click', () => pickAvatar(async (photo) => {
+    const r = await api('/api/account/photo', { method: 'POST', body: { photo } });
+    state.account = r.account; save();
+    renderCommunity();
+  }));
   $$('[data-comm]', page).forEach((b) => b.addEventListener('click', () => { commOpen = b.dataset.comm; renderCommunity(); }));
   $$('[data-new]', page).forEach((b) => b.addEventListener('click', () => {
     const kind = b.dataset.new, fam = kind === 'family';
@@ -743,7 +763,7 @@ async function renderCommunityDetail(id) {
     <div class="comm-map" id="commMap" role="img" aria-label="Map of storm reports in ${esc(c.name)}"></div>
     ${fam ? `<section class="card block">
       <div class="section-head"><h3>Members</h3></div>
-      <ul class="people">${c.people.map((p) => `<li><span class="avatar">${esc(p.name.slice(0, 1).toUpperCase())}</span><div>
+      <ul class="people">${c.people.map((p) => `<li>${avatarHTML(p.name, p.photo)}<div>
         <strong>${esc(p.name)}${p.you ? ' (you)' : ''}</strong>
         <small class="${p.safe_at ? 'safe' : ''}">${p.safe_at ? `Safe · checked in ${esc(fmtDay(p.safe_at, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}` : 'No check-in yet'}</small>
         ${p.places.length ? `<div class="place-chips">${p.places.map((pl) => `<span class="place-chip"><i class="dot lv-${pl.level}"></i>${esc(pl.label)}${pl.city ? `, ${esc(pl.city)}` : ''} · ${pl.done}/${pl.total} done</span>`).join('')}</div>` : '<small>No plan yet</small>'}
@@ -813,6 +833,39 @@ async function openReport(r) {
   $('#clearBtn').addEventListener('click', async () => {
     try { await api(`/api/reports/${r.id}/clear`, { method: 'POST' }); closeSheet(); renderCommunity(); toast('Marked as cleared.'); } catch (e) { toast(e.message); }
   });
+}
+
+/* Profile pictures: cropped to a square and shrunk to 256 x 256 before upload. */
+function squarePhoto(file, size = 256) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const side = Math.min(img.width, img.height);
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file isn’t a photo.')); };
+    img.src = url;
+  });
+}
+function avatarHTML(name, photo, cls = '') {
+  return photo ? `<img class="avatar ${cls}" src="${esc(photo)}" alt="">`
+    : `<span class="avatar ${cls}" aria-hidden="true">${esc((name || '?').trim().slice(0, 1).toUpperCase())}</span>`;
+}
+// Opens the photo picker; calls upload(dataUrl) with the shrunk picture.
+function pickAvatar(upload) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.addEventListener('change', async () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    try { await upload(await squarePhoto(f)); toast('Picture saved.'); } catch (e) { toast(e.message); }
+  });
+  inp.click();
 }
 
 function compress(file, max = 1280, q = 0.72) {

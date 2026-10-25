@@ -337,6 +337,16 @@ class OrgTests(unittest.TestCase):
         self.assertTrue(o["verified"])
         config.ADMIN_TOKEN = ""
 
+    def test_org_photo_needs_key(self):
+        made = self.c.post("/api/orgs", json={"name": "Logo Org", "services": ["food"], "lat": 37.6, "lon": -122.4}).get_json()
+        oid, key = made["org"]["id"], made["key"]
+        pic = "data:image/jpeg;base64," + "A" * 100
+        self.assertEqual(self.c.post(f"/api/orgs/{oid}/photo", json={"photo": pic}).status_code, 404)
+        self.assertEqual(self.c.post(f"/api/orgs/{oid}/photo", json={"photo": "data:text/html,hi"}, headers={"X-Org-Key": key}).status_code, 400)
+        self.assertEqual(self.c.post(f"/api/orgs/{oid}/photo", json={"photo": pic}, headers={"X-Org-Key": key}).status_code, 200)
+        o = next(o for o in self.c.get("/api/orgs?lat=37.6&lon=-122.4").get_json() if o["id"] == oid)
+        self.assertEqual(o["photo"], pic)
+
     def test_org_validation(self):
         self.assertEqual(self.c.post("/api/orgs", json={"name": "X", "services": ["food"], "lat": 37, "lon": -122}).status_code, 400)
         self.assertEqual(self.c.post("/api/orgs", json={"name": "Good Name", "services": [], "lat": 37, "lon": -122}).status_code, 400)
@@ -358,6 +368,11 @@ class AccountCommunityTests(unittest.TestCase):
         self.assertEqual(res.status_code, 201, res.get_json())
         row = db.one("SELECT pw_hash FROM accounts WHERE email = ?", ("j@example.com",))
         self.assertNotIn("longenough1", row["pw_hash"])  # only a hash is stored
+        pic = "data:image/jpeg;base64," + "B" * 100
+        self.assertEqual(c.post("/api/account/photo", json={"photo": pic}, headers=OTHER).status_code, 400)  # not logged in
+        self.assertEqual(c.post("/api/account/photo", json={"photo": pic}, headers=a).get_json()["account"]["photo"], pic)
+        self.assertIsNone(c.post("/api/account/photo", json={"photo": None}, headers=a).get_json()["account"]["photo"])
+        c.post("/api/account/photo", json={"photo": pic}, headers=a)
 
         # Logging in on a new phone brings the plan along.
         b = {"X-Device-Id": "new-phone-bbbb2"}
