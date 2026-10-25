@@ -189,6 +189,8 @@ function renderAll() {
   if (currentView === 'community') renderCommunity();
   if (currentView === 'news') renderNews();
 }
+const MISSING_NAME = { flood: 'FEMA flood map', elevation: 'Ground height', alerts: 'Weather alerts', forecast: 'Rain forecast', geocode: 'Address lookup' };
+const TR_MISSING_LEAD = 'Couldn’t reach right now (pull to refresh later):';
 const LEVEL_TEXT = { high: 'High risk', elevated: 'Elevated risk', lower: 'Lower risk' };
 const LEVEL_COLOR = { high: '#ff8a73', elevated: '#ffc061', lower: '#63d69b' };
 
@@ -238,7 +240,7 @@ function renderPlan() {
       <p class="risk-summary">${esc(plan.summary)}</p>
       <label class="lang-pick">${icon('globe')}<span class="sr-only">Plan language</span>
         <select id="planLang">${LANGS.map(([k, v]) => `<option value="${k}" ${k === (plan.language || 'en') ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
-      ${plan.language && plan.language !== 'en' && (plan.missing || []).includes('ai') ? `<span class="risk-lang">This plan isn’t translated yet, so it’s in English. <button type="button" class="link-btn" id="retryLang">Translate now</button></span>` : ''}
+      ${plan.language && plan.language !== 'en' && (plan.missing || []).includes('ai') && !Object.keys(TR.bundle[plan.language] || {}).length ? `<span class="risk-lang">This plan isn’t translated yet, so it’s in English. <button type="button" class="link-btn" id="retryLang">Translate now</button></span>` : ''}
     </section>
 
     ${intl ? (reg ? `<section class="card region-card block"><p class="eyebrow">What El Niño usually does here</p><h3>${esc(reg.name)}</h3><span class="effect ${/wet/.test(reg.effect) ? 'eff-wet' : 'eff-dry'}">${esc(reg.effect)} · ${esc(reg.season)}</span><p class="small" style="margin:0">Live alerts and flood maps are U.S.-only for now. Follow your national weather office for warnings.</p></section>` : '')
@@ -262,7 +264,7 @@ function renderPlan() {
     <section class="block">
       <div class="section-head"><h3>Why this score</h3><span class="muted small">Every point has a source</span></div>
       <ul class="factors card">${r.factors.map((f) => `<li><span class="pts ${f.points >= 25 ? 'hot' : f.points >= 10 ? 'warm' : ''}">+${f.points}</span><div><strong>${esc(f.label)}</strong><p>${esc(f.detail)}</p><small>${esc(f.source)}</small></div></li>`).join('')}</ul>
-      ${plan.missing && plan.missing.length ? `<p class="fineprint">Couldn’t reach: ${esc(plan.missing.map((m) => m === 'ai' ? 'AI translation' : m).join(', '))}. Pull to refresh later.</p>` : ''}
+      ${(plan.missing || []).filter((m) => m !== 'ai').length ? `<p class="fineprint">${esc(TR_MISSING_LEAD)} ${(plan.missing || []).filter((m) => m !== 'ai').map((m) => `<span>${esc(MISSING_NAME[m] || m)}</span>`).join(', ')}</p>` : ''}
     </section>
 
     ${plan.forecast && plan.forecast.length ? `<section class="block">
@@ -1097,6 +1099,7 @@ function trBundle(lang) {
       const re = new RegExp('^' + k.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{(\d)\}/g, (m, n) => { names.push(+n); return '(.+?)'; }) + '$');
       return { re, names, out: TR.bundle[lang][k] };
     });
+    if (plan && plan.language === lang) renderPlan();  // drop the "not translated yet" note now that we can translate
     trSchedule();
   });
   return null;
@@ -1113,7 +1116,11 @@ function trLookup(lang, key, depth = 0) {
     t.names.forEach((n, i) => {
       const part = m[i + 1];
       const cap = part.charAt(0).toUpperCase() + part.slice(1);
-      const tr = trLookup(lang, part, depth + 1) || trLookup(lang, cap, depth + 1) || part;
+      let tr = trLookup(lang, part, depth + 1) || trLookup(lang, cap, depth + 1);
+      if (!tr) {  // e.g. "Saturday 2 PM": translate the day name and keep the time
+        const b = TR.bundle[lang] || {};
+        tr = part.replace(/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)( Night)?\b/g, (w) => b[w] || w);
+      }
       out = out.split('{' + n + '}').join(tr);
     });
     return out;
