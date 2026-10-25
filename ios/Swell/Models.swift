@@ -372,7 +372,7 @@ enum Household: String, CaseIterable, Identifiable {
 }
 
 let languages: [(code: String, name: String)] = [
-    ("en", "English"), ("es", "Español"), ("ne", "नेपाली (Nepali)"), ("zh", "中文 (Chinese)"), ("tl", "Tagalog"),
+    ("en", "English"), ("es", "Español"), ("ne", "नेपाली (Nepali)"), ("zh", "简体中文 (Mandarin, Simplified)"), ("zh-Hant", "繁體中文 (Mandarin, Traditional)"), ("yue", "粵語 (Cantonese)"), ("tl", "Tagalog"),
     ("vi", "Tiếng Việt"), ("ko", "한국어 (Korean)"), ("hi", "हिन्दी (Hindi)"), ("ar", "العربية (Arabic)"), ("ru", "Русский"),
 ]
 

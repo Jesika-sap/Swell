@@ -337,6 +337,16 @@ class OrgTests(unittest.TestCase):
         self.assertTrue(o["verified"])
         config.ADMIN_TOKEN = ""
 
+    def test_screen_text_translation_is_cached(self):
+        r = self.c.post("/api/translate", json={"language": "ne", "texts": ["Scan a photo", "Scan a photo", "Map"]}).get_json()
+        self.assertEqual(r["translations"]["Scan a photo"], "ने Scan a photo")
+        self.assertTrue(r["ai"])
+        fakes.GEMINI_MODE["plan"] = "down"  # AI off: answers now come from the saved copy
+        r = self.c.post("/api/translate", json={"language": "ne", "texts": ["Map"]}).get_json()
+        self.assertEqual(r["translations"]["Map"], "ने Map")
+        fakes.GEMINI_MODE["plan"] = "ok"
+        self.assertEqual(self.c.post("/api/translate", json={"language": "xx", "texts": ["Map"]}).status_code, 400)
+
     def test_org_photo_needs_key(self):
         made = self.c.post("/api/orgs", json={"name": "Logo Org", "services": ["food"], "lat": 37.6, "lon": -122.4}).get_json()
         oid, key = made["org"]["id"], made["key"]

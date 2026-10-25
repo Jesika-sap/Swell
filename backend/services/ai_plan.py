@@ -9,7 +9,10 @@ from services import gemini
 from services.http import ServiceError
 
 LANGUAGES = {
-    "en": "English", "es": "Spanish", "ne": "Nepali", "zh": "Chinese (Simplified)",
+    "en": "English", "es": "Spanish", "ne": "Nepali",
+    "zh": "Simplified Chinese, the way Mandarin speakers in mainland China write",
+    "zh-Hant": "Traditional Chinese, the way Mandarin speakers in Taiwan write",
+    "yue": "Cantonese, written the way Cantonese speakers in Hong Kong write it, in Traditional Chinese characters",
     "tl": "Tagalog", "vi": "Vietnamese", "ko": "Korean", "hi": "Hindi", "ar": "Arabic", "ru": "Russian",
 }
 

@@ -4,7 +4,7 @@ A strong El Niño is forecast for winter 2026–27. In California it means storm
 
 - **Pick who the plan is for:** a home and family, or a farm or ranch.
 - **Your risk, from official data.** In the U.S. it checks the FEMA flood map, USGS ground height, live National Weather Service alerts and king tide dates for your exact address, then shows a 0–100 score where every point names its source. Elsewhere it plans for what El Niño brings to that region, like drought in Nepal.
-- **A checklist made for you,** in 10 languages including Spanish, Nepali, Chinese and Tagalog. It changes for older adults, people without a car, powered medical devices, pets, renters, hillside homes, crops, animals and farm workers.
+- **A checklist made for you,** in 12 languages including Spanish, Nepali, Mandarin, Cantonese and Tagalog. It changes for older adults, people without a car, powered medical devices, pets, renters, hillside homes, crops, animals and farm workers.
 - **AI Scan.** Take a photo of your home, yard or farm. AI spots risks it can see and adds them to your checklist.
 - **Ask for help.** Request sandbags, a ride, a check-in call, translation or farm help. Local organizations sign up, see requests near them, and say yes. Only the group that accepts sees your exact location and contact.
 - **A neighbor map** of storm problems with photos, and **El Niño news** with real sources.

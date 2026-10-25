@@ -104,6 +104,10 @@ def fake(method, url, **kw):
                 tasks = tasks[1:]
             items = [{"id": t["id"], "title": ("ES: " if lang_es else "") + t["title"], "why": t["why"]} for t in tasks]
             text = json.dumps({"summary": "Tu riesgo es alto. Consigue sacos de arena hoy." if lang_es else "Your risk is high. Get sandbags today.", "items": items})
+        elif "Translate each phrase" in prompt:
+            start = prompt.index("Phrases (JSON, keyed by number): ") + len("Phrases (JSON, keyed by number): ")
+            phrases = json.loads(prompt[start:prompt.index("\nReply with ONLY JSON")])
+            text = json.dumps({k: "ने " + v for k, v in phrases.items()}, ensure_ascii=False)
         elif "sandbags" in prompt and "official places" in prompt:
             text = json.dumps({"sites": [{"name": "Sacramento City Corporation Yard", "address": "5730 24th St, Sacramento, CA", "notes": "Free sandbags while supplies last", "kind": "sandbags"}]})
             meta = {"groundingChunks": [{"web": {"uri": "https://example.gov/sandbags", "title": "cityofsacramento.gov"}}]}

@@ -52,7 +52,7 @@ flowchart LR
 | **Clients** | What people tap and see. Both apps share the same server, so a plan made on the web shows up on the phone. | Web: HTML, CSS, JavaScript (PWA). iPhone: Swift, SwiftUI, MapKit, PhotosUI |
 | **API** | One set of web addresses (`/api/...`) that both apps call. Checks inputs, enforces rate limits, and keeps each device's plans private. | Python 3.12, Flask |
 | **Logic** | Turns raw data into decisions. The risk score and checklist are plain Python rules, so they're predictable and testable. | `risk.py`, `checklist.py`, `resources.py` |
-| **AI** | Language and judgment: rewrites the checklist in 10 languages, finds and summarizes news with real source links, labels flood photos, and turns AI Scan photos into checklist steps. | Google Gemini API, Google Search grounding |
+| **AI** | Language and judgment: rewrites the checklist and the rest of the screen in 12 languages, finds and summarizes news with real source links, labels flood photos, and turns AI Scan photos into checklist steps. | Google Gemini API, Google Search grounding |
 | **Data** | Saved plans, checklist progress, neighbor reports, organizations, help requests, and a cache of outside answers. | PostgreSQL in production, SQLite on a laptop (same SQL) |
 | **Public data** | Official facts about a location. | U.S. Census Geocoder, FEMA NFHL, USGS EPQS, NWS API, OpenStreetMap Nominatim, NOAA Climate Prediction Center (regional El Niño effects) |
 

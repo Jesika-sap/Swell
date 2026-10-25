@@ -19,6 +19,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 import config
 import db
+from services import ui_translate
 from services import geocode, weather, flood, risk, checklist, resources, news, ai_plan, gemini, photo_ai, scan as scan_svc, region as regions_svc
 from services.http import ServiceError
 
@@ -334,6 +335,24 @@ def change_language(plan_id):
     db.execute("UPDATE plans SET language = ?, checklist = ?, risk = ?, updated_at = ? WHERE id = ?",
                (language, json.dumps(items), json.dumps({**r, "summary": summary, "translated": translated}), now_iso(), plan_id))
     return jsonify(plan_payload(plan_id, help_=help_, translated=translated))
+
+
+@app.post("/api/translate")
+def translate_ui():
+    """Translate the app's screen text (buttons, headings, weather...) into a language."""
+    d = body()
+    lang = d.get("language")
+    if lang not in ai_plan.LANGUAGES or lang == "en":
+        raise BadRequest("Pick a language from the list")
+    texts = d.get("texts")
+    if not isinstance(texts, list):
+        raise BadRequest("texts must be a list")
+    texts = [t.strip() for t in texts if isinstance(t, str) and 0 < len(t.strip()) <= 600][:400]
+    if not gemini.available():
+        return jsonify({"translations": {}, "ai": False})
+    rate_limit("translate", 600)
+    found, failed = ui_translate.translate(texts, lang, ai_plan.LANGUAGES[lang])
+    return jsonify({"translations": found, "ai": not failed})
 
 
 @app.get("/api/plan/<plan_id>")

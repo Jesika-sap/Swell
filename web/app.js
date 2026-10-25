@@ -58,7 +58,7 @@ async function api(path, opts = {}) {
 }
 
 /* ---------------- onboarding ---------------- */
-const LANGS = [['en', 'English'], ['es', 'Español'], ['ne', 'नेपाली (Nepali)'], ['zh', '中文 (Chinese)'], ['tl', 'Tagalog'],
+const LANGS = [['en', 'English'], ['es', 'Español'], ['ne', 'नेपाली (Nepali)'], ['zh', '简体中文 (Mandarin, Simplified)'], ['zh-Hant', '繁體中文 (Mandarin, Traditional)'], ['yue', '粵語 (Cantonese)'], ['tl', 'Tagalog'],
   ['vi', 'Tiếng Việt'], ['ko', '한국어 (Korean)'], ['hi', 'हिन्दी (Hindi)'], ['ar', 'العربية (Arabic)'], ['ru', 'Русский']];
 const HOUSEHOLD = [
   ['kids', 'Kids', 'Under 18', '<circle cx="12" cy="7" r="3"/><path d="M7 21v-5a5 5 0 0 1 10 0v5"/>'],
@@ -99,7 +99,7 @@ $('#obFacts').innerHTML = [
 ].map(([b, t, s]) => `<div class="fact"><b>${b}</b><span>${t}<small>${s}</small></span></div>`).join('');
 $('#langSelect').innerHTML = LANGS.map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
 $('#langSelect').value = state.language;
-$('#langSelect').addEventListener('change', (e) => { state.language = e.target.value; save(); });
+$('#langSelect').addEventListener('change', (e) => { state.language = e.target.value; save(); trSchedule(); });
 $('#obStart').addEventListener('click', () => obShow(state.account ? 2 : 9));
 $$('[data-role]').forEach((b) => b.addEventListener('click', () => { role = b.dataset.role; obShow(3); }));
 $('#farmPick').innerHTML = FARM_GROWS.map(([k, t]) => `<button class="pick" type="button" data-grow="${k}" aria-pressed="false"><strong>${esc(t)}</strong></button>`).join('');
@@ -1077,9 +1077,79 @@ $('#refreshBtn').addEventListener('click', async () => {
   b.disabled = false;
 });
 
+/* ---------------- whole-screen translation ----------------
+   The checklist and summary are translated when the plan is made. Everything
+   else on screen (buttons, headings, weather, risk reasons, tabs) is translated
+   here: we collect the English text on screen, ask the server once per phrase,
+   and remember the answers on this device. Names and numbers stay as they are. */
+const TR = { lang: 'en', mem: {}, asked: new Set(), nodes: new Set(), timer: null, busy: false };
+const TR_SKIP = 'script,style,textarea,input,select,option,code,svg,.keybox,.leaflet-control-attribution,[data-no-tr]';
+function uiLang() { return (plan && plan.language) || state.language || 'en'; }
+function trMem(lang) {
+  if (!TR.mem[lang]) {
+    try { TR.mem[lang] = JSON.parse(localStorage.getItem('swell-tr-' + lang) || '{}'); } catch (e) { TR.mem[lang] = {}; }
+  }
+  return TR.mem[lang];
+}
+function trSave(lang) {
+  try {
+    const m = trMem(lang), keys = Object.keys(m);
+    if (keys.length > 4000) keys.slice(0, keys.length - 4000).forEach((k) => delete m[k]);
+    localStorage.setItem('swell-tr-' + lang, JSON.stringify(m));
+  } catch (e) { /* storage full or blocked: translations still work for this visit */ }
+}
+function trPlanText() {
+  const s = new Set();
+  if (plan) { if (plan.summary) s.add(plan.summary.trim()); (plan.checklist || []).forEach((t) => { s.add((t.title || '').trim()); s.add((t.why || '').trim()); }); }
+  return s;
+}
+function trRestore() {
+  TR.nodes.forEach((n) => {
+    if (n.nodeType === 3) { if (n.__trOrig != null) n.nodeValue = n.__trOrig; delete n.__trOrig; delete n.__trOut; }
+    else if (n.dataset && n.dataset.trPh != null) { n.placeholder = n.dataset.trPh; delete n.dataset.trPh; }
+  });
+  TR.nodes.clear();
+}
+function trPass() {
+  const lang = uiLang();
+  if (lang !== TR.lang) { trRestore(); TR.lang = lang; document.documentElement.lang = lang; }
+  if (lang === 'en') return;
+  const mem = trMem(lang), skipSet = trPlanText(), want = new Set();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.__trOut != null && n.nodeValue === n.__trOut) continue;          // already done
+    const orig = n.nodeValue, key = orig.trim();
+    if (!/[A-Za-z]{2}/.test(key) || skipSet.has(key) || key.length > 600) continue;
+    const el = n.parentElement;
+    if (!el || el.closest(TR_SKIP)) continue;
+    if (mem[key]) { n.__trOrig = orig; n.__trOut = orig.replace(key, mem[key]); n.nodeValue = n.__trOut; TR.nodes.add(n); }
+    else if (!TR.asked.has(lang + '|' + key)) want.add(key);
+  }
+  document.querySelectorAll('[placeholder]').forEach((el) => {
+    const orig = el.dataset.trPh != null ? el.dataset.trPh : el.placeholder, key = (orig || '').trim();
+    if (!/[A-Za-z]{2}/.test(key) || el.closest('[data-no-tr]')) return;
+    if (mem[key]) { if (el.dataset.trPh == null) el.dataset.trPh = orig; el.placeholder = mem[key]; TR.nodes.add(el); }
+    else if (!TR.asked.has(lang + '|' + key)) want.add(key);
+  });
+  if (want.size) trFetch(lang, [...want]);
+}
+async function trFetch(lang, texts) {
+  texts = texts.slice(0, 400);
+  texts.forEach((t) => TR.asked.add(lang + '|' + t));
+  try {
+    const r = await api('/api/translate', { method: 'POST', body: { language: lang, texts } });
+    Object.assign(trMem(lang), r.translations || {});
+    trSave(lang);
+  } catch (e) { /* the screen stays partly English; the plan itself is already translated */ }
+  trSchedule();
+}
+function trSchedule() { clearTimeout(TR.timer); TR.timer = setTimeout(() => { TR.observer.disconnect(); try { trPass(); } finally { TR.observer.observe(document.body, { childList: true, subtree: true, characterData: true }); } }, 60); }
+TR.observer = new MutationObserver(trSchedule);
+TR.observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
 /* ---------------- boot ---------------- */
 document.title = CFG.name;
-$$('.app-name').forEach((el) => { el.textContent = CFG.name; });
+$$('.app-name').forEach((el) => { el.textContent = CFG.name; el.dataset.noTr = ''; });
 (async function boot() {
   if (!state.current) { showOnboard(1); return; }
   showApp();
