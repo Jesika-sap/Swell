@@ -28,7 +28,9 @@ function toast(msg, ms = 3200) {
 }
 function fmtDay(iso, opts = { month: 'short', day: 'numeric' }) {
   if (!iso) return '';
-  return new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString(undefined, opts);
+  const loc = { zh: 'zh-CN', 'zh-Hant': 'zh-TW', yue: 'zh-HK', tl: 'fil' }[uiLang()] || uiLang();
+  try { return new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString(loc, opts); }
+  catch (e) { return new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString(undefined, opts); }
 }
 
 /* ---------------- state (this device only) ---------------- */
@@ -1082,8 +1084,8 @@ $('#refreshBtn').addEventListener('click', async () => {
    else on screen (buttons, headings, weather, risk reasons, tabs) is translated
    here: we collect the English text on screen, ask the server once per phrase,
    and remember the answers on this device. Names and numbers stay as they are. */
-const TR = { lang: 'en', mem: {}, asked: new Set(), nodes: new Set(), timer: null, busy: false };
-const TR_SKIP = 'script,style,textarea,input,select,option,code,svg,.keybox,.leaflet-control-attribution,[data-no-tr]';
+const TR = { lang: 'en', mem: {}, asked: new Set(), tries: {}, nodes: new Set(), timer: null, inflight: 0 };
+const TR_SKIP = 'script,style,textarea,input,select,option,code,.keybox,.leaflet-control-attribution,#trBadge,[data-no-tr]';
 function uiLang() { return (plan && plan.language) || state.language || 'en'; }
 function trMem(lang) {
   if (!TR.mem[lang]) {
@@ -1098,11 +1100,6 @@ function trSave(lang) {
     localStorage.setItem('swell-tr-' + lang, JSON.stringify(m));
   } catch (e) { /* storage full or blocked: translations still work for this visit */ }
 }
-function trPlanText() {
-  const s = new Set();
-  if (plan) { if (plan.summary) s.add(plan.summary.trim()); (plan.checklist || []).forEach((t) => { s.add((t.title || '').trim()); s.add((t.why || '').trim()); }); }
-  return s;
-}
 function trRestore() {
   TR.nodes.forEach((n) => {
     if (n.nodeType === 3) { if (n.__trOrig != null) n.nodeValue = n.__trOrig; delete n.__trOrig; delete n.__trOut; }
@@ -1114,12 +1111,12 @@ function trPass() {
   const lang = uiLang();
   if (lang !== TR.lang) { trRestore(); TR.lang = lang; document.documentElement.lang = lang; }
   if (lang === 'en') return;
-  const mem = trMem(lang), skipSet = trPlanText(), want = new Set();
+  const mem = trMem(lang), want = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     if (n.__trOut != null && n.nodeValue === n.__trOut) continue;          // already done
     const orig = n.nodeValue, key = orig.trim();
-    if (!/[A-Za-z]{2}/.test(key) || skipSet.has(key) || key.length > 600) continue;
+    if (!/[A-Za-z]{2}/.test(key) || key.length > 600) continue;
     const el = n.parentElement;
     if (!el || el.closest(TR_SKIP)) continue;
     if (mem[key]) { n.__trOrig = orig; n.__trOut = orig.replace(key, mem[key]); n.nodeValue = n.__trOut; TR.nodes.add(n); }
@@ -1136,12 +1133,26 @@ function trPass() {
 async function trFetch(lang, texts) {
   texts = texts.slice(0, 400);
   texts.forEach((t) => TR.asked.add(lang + '|' + t));
+  TR.inflight++; trBadge();
+  let got = {};
   try {
     const r = await api('/api/translate', { method: 'POST', body: { language: lang, texts } });
-    Object.assign(trMem(lang), r.translations || {});
+    got = r.translations || {};
+    Object.assign(trMem(lang), got);
     trSave(lang);
-  } catch (e) { /* the screen stays partly English; the plan itself is already translated */ }
+  } catch (e) { /* tried again below */ }
+  TR.inflight--; trBadge();
+  // Anything that didn't come back gets tried again (up to 4 times), so nothing stays English for good.
+  const missed = texts.filter((t) => !got[t] && (TR.tries[lang + '|' + t] = (TR.tries[lang + '|' + t] || 0) + 1) < 4);
+  if (missed.length) setTimeout(() => { missed.forEach((t) => TR.asked.delete(lang + '|' + t)); trSchedule(); }, 8000);
   trSchedule();
+}
+function trBadge() {
+  let b = document.getElementById('trBadge');
+  if (!b) { b = document.createElement('div'); b.id = 'trBadge'; b.className = 'tr-badge'; b.setAttribute('role', 'status'); document.body.appendChild(b); }
+  const name = (LANGS.find((l) => l[0] === TR.lang) || [])[1] || '';
+  b.textContent = `Translating the screen into ${name}…`;
+  b.hidden = TR.inflight === 0;
 }
 function trSchedule() { clearTimeout(TR.timer); TR.timer = setTimeout(() => { TR.observer.disconnect(); try { trPass(); } finally { TR.observer.observe(document.body, { childList: true, subtree: true, characterData: true }); } }, 60); }
 TR.observer = new MutationObserver(trSchedule);

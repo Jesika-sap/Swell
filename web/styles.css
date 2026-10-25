@@ -433,3 +433,6 @@ textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surf
 .lang-pick select { background: transparent; color: #fff; border: 0; font: inherit; font-size: 14px; font-weight: 600; padding: 0; margin: 0; min-height: 0; width: auto; appearance: auto; }
 .lang-pick select option { color: #16222c; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.tr-badge { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 50; background: var(--ocean); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+.tr-badge[hidden] { display: none; }
