@@ -13,7 +13,7 @@ from services import gemini
 from services.http import ServiceError
 
 TTL = 60 * 24 * 3600
-CHUNK = 60  # phrases per AI call; several calls run at once
+CHUNK = 25  # phrases per AI call; several calls run at once
 
 
 def _key(lang, text):
@@ -51,7 +51,8 @@ def translate(texts, lang, lang_name):
     failed = False
     if todo:
         chunks = [todo[i:i + CHUNK] for i in range(0, len(todo), CHUNK)]
-        with ThreadPoolExecutor(max_workers=4) as pool:
+        print(f"[Swell] Translating {len(todo)} bits of screen text into {lang_name.split(',')[0]}...", flush=True)
+        with ThreadPoolExecutor(max_workers=6) as pool:
             for res in pool.map(lambda c: _safe(lang_name, c), chunks):
                 if res is None:
                     failed = True

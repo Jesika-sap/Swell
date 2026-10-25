@@ -1137,10 +1137,10 @@ async function trFetch(lang, texts) {
   let got = {};
   try {
     const r = await api('/api/translate', { method: 'POST', body: { language: lang, texts } });
-    got = r.translations || {};
+    got = r.translations || {}; TR.error = r.ai === false && !Object.keys(got).length ? 'AI didn’t answer' : null;
     Object.assign(trMem(lang), got);
     trSave(lang);
-  } catch (e) { /* tried again below */ }
+  } catch (e) { TR.error = e.message; }
   TR.inflight--; trBadge();
   // Anything that didn't come back gets tried again (up to 4 times), so nothing stays English for good.
   const missed = texts.filter((t) => !got[t] && (TR.tries[lang + '|' + t] = (TR.tries[lang + '|' + t] || 0) + 1) < 4);
@@ -1151,7 +1151,7 @@ function trBadge() {
   let b = document.getElementById('trBadge');
   if (!b) { b = document.createElement('div'); b.id = 'trBadge'; b.className = 'tr-badge'; b.setAttribute('role', 'status'); document.body.appendChild(b); }
   const name = (LANGS.find((l) => l[0] === TR.lang) || [])[1] || '';
-  b.textContent = `Translating the screen into ${name}…`;
+  b.textContent = TR.error ? `Still translating into ${name}… (${TR.error})` : `Translating the screen into ${name}…`;
   b.hidden = TR.inflight === 0;
 }
 function trSchedule() { clearTimeout(TR.timer); TR.timer = setTimeout(() => { TR.observer.disconnect(); try { trPass(); } finally { TR.observer.observe(document.body, { childList: true, subtree: true, characterData: true }); } }, 60); }
