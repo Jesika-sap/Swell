@@ -269,6 +269,9 @@ def plan_payload(plan_id, live=None, help_=None, missing=None, translated=False)
     if help_ is None:
         help_ = resources.for_place(place, row["lat"], row["lon"])
     r = json.loads(row["risk"])
+    missing = list(missing or [])
+    if row["language"] != "en" and not (translated or r.get("translated")) and "ai" not in missing:
+        missing.append("ai")  # the app shows built-in translations and can try the AI again later
     return {
         "id": row["id"], "label": row["label"], "address": row["address"],
         "lat": row["lat"], "lon": row["lon"], "place": place, "language": row["language"],
@@ -328,8 +331,8 @@ def change_language(plan_id):
             missing.append("ai")
     elif language != "en":
         missing.append("ai")
-    if language != "en" and not translated:
-        raise BadRequest("Couldn't translate right now. Check that AI is ON in Terminal, then try again.")
+    # If the AI is busy or out of its free limit, still switch: the app shows its
+    # built-in translations of every step, and "ai" in missing lets it try again later.
     if not summary:
         summary = ai_plan.fallback_summary(r, place_name)
     db.execute("UPDATE plans SET language = ?, checklist = ?, risk = ?, updated_at = ? WHERE id = ?",

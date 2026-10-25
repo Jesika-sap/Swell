@@ -112,6 +112,12 @@ class ApiTests(unittest.TestCase):
         self.assertIn("arena", p["summary"])
         # Switching an existing plan back to English keeps ticked boxes.
         self.c.post(f"/api/plan/{p['id']}/check", json={"item_id": p["checklist"][0]["id"], "done": True}, headers=DEV)
+        fakes.GEMINI_MODE["plan"] = "down"  # AI out of quota: the switch still works, marked untranslated
+        ne = self.c.post(f"/api/plan/{p['id']}/language", json={"language": "ne"}, headers=DEV)
+        self.assertEqual(ne.status_code, 200)
+        self.assertEqual(ne.get_json()["language"], "ne")
+        self.assertIn("ai", ne.get_json()["missing"])
+        fakes.GEMINI_MODE["plan"] = "ok"
         en = self.c.post(f"/api/plan/{p['id']}/language", json={"language": "en"}, headers=DEV).get_json()
         self.assertEqual(en["language"], "en")
         self.assertFalse(en["checklist"][0]["title"].startswith("ES: "))
