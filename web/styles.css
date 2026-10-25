@@ -436,3 +436,11 @@ textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surf
 
 .tr-badge { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 50; background: var(--ocean); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
 .tr-badge[hidden] { display: none; }
+
+/* Small phones: keep the place name and the logo from touching. */
+.topbar { column-gap: 12px; }
+.place-btn { max-width: calc(50vw - 40px); }
+@media (max-width: 480px) {
+  .wordmark .app-name { display: none; }
+  .wordmark .logo { width: 30px; height: 30px; border-radius: 8px; }
+}
