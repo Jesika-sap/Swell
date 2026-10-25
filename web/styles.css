@@ -441,6 +441,9 @@ textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surf
 .topbar { column-gap: 12px; }
 .place-btn { max-width: calc(50vw - 40px); }
 @media (max-width: 480px) {
+  .topbar { grid-template-columns: minmax(0, auto) 1fr auto; }
+  .place-btn { max-width: 100%; }
+  .wordmark { justify-self: end; }
   .wordmark .app-name { display: none; }
   .wordmark .logo { width: 30px; height: 30px; border-radius: 8px; }
 }
