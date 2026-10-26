@@ -640,7 +640,7 @@ function openLogout() {
 }
 
 /* ---------------- map ---------------- */
-let map = null, layer = null, mapFocus = null;
+let map = null, layer = null, mapFocus = null, mapPlanKey = null;
 function pinIcon(cls, svg) {
   return L.divIcon({ className: '', html: `<div class="pin ${cls}"><svg viewBox="0 0 24 24">${svg}</svg></div>`, iconSize: [30, 30], iconAnchor: [15, 30] });
 }
@@ -657,6 +657,9 @@ async function renderMap() {
   } else {
     map.invalidateSize();
   }
+  // Switched to another place (say Pokhara after Daly City)? Move the map there.
+  const key = `${plan.id}:${plan.lat},${plan.lon}`;
+  if (key !== mapPlanKey) { mapPlanKey = key; map.setView([plan.lat, plan.lon], 14); }
   layer.clearLayers();
   L.marker([plan.lat, plan.lon], { icon: pinIcon('pin-home', ICON.home) }).addTo(layer).bindPopup(`<b>${esc(plan.label)}</b>`);
   const bags = plan.risk.hazard === 'drought' ? [] : (plan.help.sandbags || []);
