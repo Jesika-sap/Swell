@@ -640,7 +640,7 @@ function openLogout() {
 }
 
 /* ---------------- map ---------------- */
-let map = null, layer = null;
+let map = null, layer = null, mapFocus = null;
 function pinIcon(cls, svg) {
   return L.divIcon({ className: '', html: `<div class="pin ${cls}"><svg viewBox="0 0 24 24">${svg}</svg></div>`, iconSize: [30, 30], iconAnchor: [15, 30] });
 }
@@ -663,8 +663,16 @@ async function renderMap() {
   bags.forEach((s) => L.marker([s.lat, s.lon], { icon: pinIcon('pin-bag', ICON.bag) }).addTo(layer)
     .bindPopup(`<b>Sandbags: ${esc(s.name)}</b><br>${esc(s.address)}<br><a href="${mapsLink(s.address)}" target="_blank" rel="noopener">Directions</a>`));
   $('#mapCard').innerHTML = `<span><i style="background:var(--ocean)"></i>Your place</span>${bags.length ? '<span><i style="background:#b86a00"></i>Sandbags</span>' : ''}<span><i style="background:#c0392b"></i>Storm reports</span>`;
-  let reports = [];
-  try { reports = await api(`/api/reports?lat=${plan.lat}&lon=${plan.lon}&miles=10`); } catch (e) { reports = []; }
+  // After posting at a typed address, jump there and load reports around that spot too.
+  const focus = mapFocus; mapFocus = null;
+  const spots = [{ lat: plan.lat, lon: plan.lon }];
+  if (focus) { map.setView([focus.lat, focus.lon], 16); spots.push(focus); }
+  const seen = new Set(), reports = [];
+  for (const s of spots) {
+    let list = [];
+    try { list = await api(`/api/reports?lat=${s.lat}&lon=${s.lon}&miles=10`); } catch (e) { list = []; }
+    list.forEach((r) => { if (!seen.has(r.id)) { seen.add(r.id); reports.push(r); } });
+  }
   reportPins(layer, reports);
   setTimeout(() => map.invalidateSize(), 50);
 }
@@ -912,6 +920,10 @@ async function openReportForm(after, center, communityId) {
     <select id="repGroup">${groups.map((g) => `<option value="${g.id}" ${g.id === communityId ? 'selected' : ''}>${esc(g.name)} (${esc(COMM_KIND[g.kind])})</option>`).join('')}</select>
     <label class="field-label">Where is it?</label>
     <div class="sev-row ${center ? 'three' : ''}" id="whereRow">${center ? '<button type="button" data-where="map" aria-pressed="true">Center of the map</button>' : ''}<button type="button" data-where="here" aria-pressed="${!center}">Where I am now</button><button type="button" data-where="place" aria-pressed="false">At ${esc(plan.label || 'my place')}</button></div>
+    <label class="field-label small" for="repAddr">Or type an address or cross streets</label>
+    <div class="addr-row"><input id="repAddr" type="text" maxlength="200" autocomplete="street-address" placeholder="e.g. 2nd Ave & El Camino Real, San Mateo"><button class="btn btn-ghost" type="button" id="repFind">Find</button></div>
+    <p class="small addr-found" id="addrFound" hidden></p>
+    <div class="addr-map" id="addrMap" hidden></div>
     <label class="photo-drop" id="drop"><input type="file" id="repFile" accept="image/*" capture="environment">${icon('camera')}<strong>Add a photo</strong><span class="small">AI will label it for you</span></label>
     <img class="photo-prev" id="repPrev" alt="" hidden>
     <div class="ai-note" id="aiNote" hidden></div>
@@ -922,7 +934,40 @@ async function openReportForm(after, center, communityId) {
     <label class="field-label">How bad?</label>
     <div class="sev-row" id="sevRow">${[[1, 'Minor'], [2, 'Avoid it'], [3, 'Dangerous']].map(([v, t]) => `<button type="button" data-sev="${v}" aria-pressed="${v === 2}">${t}</button>`).join('')}</div>
     <button class="btn btn-primary btn-wide" type="button" id="repSend">Post report</button>`);
-  $$('#whereRow button').forEach((b) => b.addEventListener('click', () => { draft.where = b.dataset.where; $$('#whereRow button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
+  const pickWhere = (w) => { draft.where = w; $$('#whereRow button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.where === w))); };
+  $$('#whereRow button').forEach((b) => b.addEventListener('click', () => { pickWhere(b.dataset.where); $('#repAddr').value = ''; draft.spot = null; $('#addrFound').hidden = true; $('#addrMap').hidden = true; }));
+  // Typed address: look it up and show a pin so the person can check it's the right spot.
+  let miniMap = null, miniPin = null;
+  async function findAddress() {
+    const q = $('#repAddr').value.trim();
+    if (!q) { toast('Type an address first.'); return null; }
+    if (draft.spot && draft.spot.q === q) return draft.spot;
+    const out = $('#addrFound');
+    out.hidden = false; out.innerHTML = '<span class="spinner"></span> Finding it…';
+    try {
+      const g = await api(`/api/geocode?q=${encodeURIComponent(q)}`);
+      draft.spot = { q, lat: g.lat, lon: g.lon, address: g.address };
+      out.innerHTML = `${icon('check')} Found: <strong>${esc(g.address)}</strong>`;
+      const box = $('#addrMap');
+      if (typeof L !== 'undefined') {
+        box.hidden = false;
+        if (!miniMap) {
+          miniMap = L.map(box, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false });
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMap);
+        }
+        miniMap.setView([g.lat, g.lon], 16);
+        if (miniPin) miniPin.setLatLng([g.lat, g.lon]); else miniPin = L.marker([g.lat, g.lon], { icon: pinIcon('pin-r' + draft.severity, ICON.drop) }).addTo(miniMap);
+        setTimeout(() => miniMap.invalidateSize(), 50);
+      }
+      return draft.spot;
+    } catch (err) {
+      draft.spot = null; out.textContent = err.message; $('#addrMap').hidden = true;
+      return null;
+    }
+  }
+  $('#repAddr').addEventListener('input', () => { pickWhere($('#repAddr').value.trim() ? 'address' : (center ? 'map' : 'here')); });
+  $('#repAddr').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); findAddress(); } });
+  $('#repFind').addEventListener('click', findAddress);
   $('#repFile').addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
@@ -949,15 +994,22 @@ async function openReportForm(after, center, communityId) {
     const btn = $('#repSend');
     btn.disabled = true;
     let spot = { lat: plan.lat, lon: plan.lon };
+    let note;
+    if (draft.where === 'address') {
+      const a = await findAddress();
+      if (!a) { btn.disabled = false; return; }
+      spot = { lat: a.lat, lon: a.lon }; note = a.address;
+    }
     if (draft.where === 'map' && center) spot = center;
     if (draft.where === 'here') {
       const h = await here();
       if (h) spot = h; else toast(`Couldn’t get your location, so it’s posted at ${plan.label || 'your place'}.`);
     }
     try {
-      await api('/api/reports', { method: 'POST', body: { ...spot, community_id: $('#repGroup').value, kind: $('#repKind').value, title: $('#repTitle').value.trim(), severity: draft.severity, photo: draft.photo, ai_checked: draft.ai } });
+      await api('/api/reports', { method: 'POST', body: { ...spot, note, community_id: $('#repGroup').value, kind: $('#repKind').value, title: $('#repTitle').value.trim(), severity: draft.severity, photo: draft.photo, ai_checked: draft.ai } });
       closeSheet(); toast('Posted. Thanks for looking out for your community.');
-      if (after) after(); else if (currentView === 'community') renderCommunity();
+      if (draft.where === 'address') { mapFocus = spot; switchView('map'); }
+      else if (after) after(); else if (currentView === 'community') renderCommunity();
     } catch (err) { btn.disabled = false; toast(err.message); }
   });
 }

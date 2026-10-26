@@ -447,3 +447,11 @@ textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surf
   .wordmark .app-name { display: none; }
   .wordmark .logo { width: 30px; height: 30px; border-radius: 8px; }
 }
+
+/* Report form: typed address */
+.addr-row { display: flex; gap: 8px; }
+.addr-row input { flex: 1; min-width: 0; }
+.addr-row .btn { flex: none; width: auto; padding: 0 18px; min-height: 48px; }
+.addr-found { display: flex; gap: 6px; align-items: center; color: var(--sea); margin: 8px 0 0; }
+.addr-found svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2.4; }
+.addr-map { height: 150px; border-radius: 14px; overflow: hidden; margin-top: 8px; border: 1.5px solid var(--line); }

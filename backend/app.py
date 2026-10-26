@@ -484,7 +484,18 @@ def create_report():
         raise BadRequest("Pick one of your groups to post to")
     if not _can_post(c, m):
         raise BadRequest("Only verified officials can post in county and city communities. Post in your neighborhood or family group instead.")
-    lat, lon = coords(d)
+    note = str(d.get("note") or "").strip()[:300]
+    address = str(d.get("address") or "").strip()[:200]
+    if address:
+        # The person typed where the problem is. Turn it into a map point.
+        try:
+            spot = geocode.geocode(address)
+        except ServiceError as e:
+            raise BadRequest(str(e))
+        lat, lon = spot["lat"], spot["lon"]
+        note = note or (spot.get("address") or address)[:300]
+    else:
+        lat, lon = coords(d)
     kind = d.get("kind") if d.get("kind") in REPORT_KINDS else "other"
     try:
         sev = max(1, min(3, int(d.get("severity", 2))))
@@ -494,9 +505,23 @@ def create_report():
     rid = uuid.uuid4().hex[:12]
     db.execute("""INSERT INTO reports (id, device_id, kind, title, note, severity, lat, lon, county, photo, ai_checked, created_at, community_id)
                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-               (rid, g.device, kind, title, str(d.get("note") or "")[:300], sev, lat, lon, c["county"],
+               (rid, g.device, kind, title, note, sev, lat, lon, c["county"],
                 valid_photo(d.get("photo")), 1 if d.get("ai_checked") else 0, now_iso(), c["id"]))
-    return jsonify({"id": rid}), 201
+    return jsonify({"id": rid, "lat": lat, "lon": lon}), 201
+
+
+@app.get("/api/geocode")
+def lookup_address():
+    """Check a typed address before posting, so the person sees where it lands."""
+    rate_limit("geocode", 60)
+    q = str(request.args.get("q") or "").strip()[:200]
+    if len(q) < 4:
+        raise BadRequest("Type a street address or cross streets")
+    try:
+        spot = geocode.geocode(q)
+    except ServiceError as e:
+        raise BadRequest(str(e))
+    return jsonify({"lat": spot["lat"], "lon": spot["lon"], "address": spot.get("address") or q})
 
 
 @app.post("/api/reports/<rid>/confirm")
