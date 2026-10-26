@@ -792,13 +792,23 @@ async function renderCommunityDetail(id) {
         <svg class="chev-r" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>`).join('')}</ul>`
       : `<div class="notice">${official ? 'No official updates right now.' : `No storm reports yet. If you see flooding, a clogged drain or a fallen tree, post it so ${fam ? 'your family knows' : 'your neighbors know'}.`}</div>`}
     </section>
-    ${group ? '<button class="link-btn danger" type="button" id="leaveBtn">Leave this group</button>' : ''}`;
+    <button class="btn btn-ghost btn-wide leave-btn" type="button" id="leaveBtn">Leave ${group ? 'this group' : 'this community'}</button>`;
   drawCommunityMap(c);
   $('#commBack').addEventListener('click', () => { commOpen = null; renderCommunity(); });
   if ($('#reportHere')) $('#reportHere').addEventListener('click', () => openReportForm(() => renderCommunity(), null, c.id));
   $$('[data-rep]', page).forEach((b) => b.addEventListener('click', () => openReport(c.reports.find((r) => r.id === b.dataset.rep))));
-  if ($('#leaveBtn')) $('#leaveBtn').addEventListener('click', async () => {
-    try { await api(`/api/communities/${id}/leave`, { method: 'POST' }); commOpen = null; toast(`You left ${c.name}.`); renderCommunity(); } catch (e) { toast(e.message); }
+  $('#leaveBtn').addEventListener('click', () => {
+    const last = group && c.members === 1;
+    openSheet(`<h2 id="sheetTitle">Leave ${esc(c.name)}?</h2>
+      <p class="muted">${last ? `You’re the only member, so leaving deletes this group and its reports.`
+        : group ? `You’ll stop seeing this group’s storm reports. You can join again with the invite code.`
+        : `You’ll stop seeing official updates for ${esc(c.name)}. Making a new plan there adds it back.`}</p>
+      <button class="btn btn-primary btn-wide leave-confirm" type="button" id="leaveYes">${last ? 'Leave and delete group' : 'Leave'}</button>
+      <button class="btn btn-ghost btn-wide" type="button" id="leaveNo">Cancel</button>`);
+    $('#leaveNo').addEventListener('click', closeSheet);
+    $('#leaveYes').addEventListener('click', async () => {
+      try { await api(`/api/communities/${id}/leave`, { method: 'POST' }); closeSheet(); commOpen = null; toast(`You left ${c.name}.`); renderCommunity(); } catch (e) { toast(e.message); }
+    });
   });
   if (fam) {
     $('#safeBtn').addEventListener('click', async () => {

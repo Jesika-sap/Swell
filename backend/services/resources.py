@@ -64,7 +64,7 @@ def ai_local_help(county, city, state):
     prompt = f"""Use Google Search to find official places to get free sandbags and official storm/flood help for residents of {place} for the 2026-27 El Niño winter.
 Only include places from official city, county or agency websites you found. Never guess an address.
 Reply with ONLY JSON: {{"sites": [{{"name": "...", "address": "street address or empty", "notes": "hours, limits or rules if listed", "kind": "sandbags or help"}}]}}"""
-    text, meta = gemini.generate([{"text": prompt}], search=True, temperature=0.1)
+    text, meta = gemini.generate([{"text": prompt}], search=True, temperature=0.1, budget=20)
     found = gemini.parse_json(text).get("sites", [])[:6]
     srcs = gemini.sources(meta)
     out = {"sites": [{"name": str(s.get("name", ""))[:90], "address": str(s.get("address", ""))[:140],

@@ -455,3 +455,5 @@ textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surf
 .addr-found { display: flex; gap: 6px; align-items: center; color: var(--sea); margin: 8px 0 0; }
 .addr-found svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2.4; }
 .addr-map { height: 150px; border-radius: 14px; overflow: hidden; margin-top: 8px; border: 1.5px solid var(--line); }
+.leave-btn { color: var(--high); border-color: color-mix(in srgb, var(--high) 35%, transparent); margin-top: 18px; }
+.leave-confirm { background: var(--high); border-color: var(--high); }

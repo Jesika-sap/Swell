@@ -67,9 +67,11 @@ def _models(first=None):
     return out
 
 
-def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=None):
+def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=None, budget=None):
     """`models` puts stronger models first for one call (AI Scan uses Pro);
-    the usual Flash models stay behind them as a fallback."""
+    the usual Flash models stay behind them as a fallback.
+    `budget` is the most seconds the whole call may take, across every model
+    it tries, so a busy AI can't keep someone staring at a loading screen."""
     """Returns (text, grounding_metadata)."""
     if not available():
         raise ServiceError("AI is not set up on this server")
@@ -84,13 +86,20 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=No
     if time.time() < _cool_until:
         raise ServiceError("Gemini's free limit is used up for now (Google answered 429). Swell will try again in a few minutes.")
     last, tried = None, []
+    deadline = time.time() + budget if budget else None
 
     def attempt(model):
         nonlocal last
         global _good
+        timeout = AI_TIMEOUT
+        if deadline:
+            timeout = min(AI_TIMEOUT, deadline - time.time())
+            if timeout < 3:
+                last = last or ServiceError("AI took too long")
+                return None
         tried.append(model)
         try:
-            data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=AI_TIMEOUT)
+            data = post_json(f"{BASE}/{model}:generateContent", body, headers, timeout=timeout)
         except ServiceError as e:
             last = e
             if "404" not in str(e):
@@ -112,7 +121,7 @@ def generate(parts, *, json_mode=False, temperature=0.3, search=False, models=No
         if got:
             return got
     # Every name we know failed (often because Google retired it): use what Google lists today.
-    for model in live_models():
+    for model in (live_models() if not deadline or time.time() < deadline else []):
         if model not in tried:
             got = attempt(model)
             if got:

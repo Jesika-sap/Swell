@@ -406,7 +406,11 @@ class AccountCommunityTests(unittest.TestCase):
         self.assertFalse(county["can_post"])
         self.assertEqual(c.post("/api/reports", json={"lat": plan["lat"], "lon": plan["lon"], "kind": "road", "title": "Road closed",
                                                       "community_id": county["id"]}, headers=b).status_code, 400)
-        self.assertEqual(c.post(f"/api/communities/{county['id']}/leave", headers=b).status_code, 400)
+        # You can leave a city or county community, and it isn't added back on the next refresh.
+        self.assertEqual(c.post(f"/api/communities/{mine['city']['id']}/leave", headers=b).status_code, 200)
+        again = {x["kind"] for x in c.get("/api/communities", headers=b).get_json()["mine"]}
+        self.assertNotIn("city", again)
+        self.assertIn("county", again)
         off = {"X-Device-Id": "county-oem-device"}
         c.post("/api/account/signup", json={"name": "County OES", "email": "oes@smcgov.example", "password": "password123"}, headers=off)
         self.assertEqual(c.post(f"/api/communities/{county['id']}/officials", json={"email": "oes@smcgov.example"}).status_code, 404)

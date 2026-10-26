@@ -143,3 +143,11 @@ CREATE TABLE IF NOT EXISTS community_members (
     joined_at     TEXT NOT NULL,
     PRIMARY KEY (community_id, account_id)
 );
+
+-- County and city communities someone chose to leave, so they aren't added back automatically.
+CREATE TABLE IF NOT EXISTS community_left (
+    community_id  TEXT NOT NULL,
+    account_id    TEXT NOT NULL,
+    left_at       TEXT NOT NULL,
+    PRIMARY KEY (community_id, account_id)
+);

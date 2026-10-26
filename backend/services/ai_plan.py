@@ -17,6 +17,9 @@ LANGUAGES = {
 }
 
 
+BUDGET = 30  # seconds. If the AI is slower, the plan still opens with the built-in text.
+
+
 def personalize(items, risk, place, household, language):
     lang = LANGUAGES.get(language, "English")
     slim = [{"id": i["id"], "title": i["title"], "why": i["why"]} for i in items]
@@ -26,6 +29,16 @@ def personalize(items, risk, place, household, language):
     if h.get("role") == "farmer":
         grows = ", ".join((h.get("farm") or {}).get("grows") or []) or "a farm"
         who = f"a farmer ({grows}); household: {who}"
+    if language == "en":
+        # The checklist is already in English, so only the short summary is new.
+        # Asking for just that is much faster than rewriting every task.
+        prompt = f"""You help families get ready for a strong El Niño winter. Write in plain words a 12-year-old understands.
+Place: {place}. Storm risk: {risk['level']} ({risk['score']}/100). Why: {factors or 'no special risks found'}.
+Household: {who}.
+Write "summary": 2 short sentences telling this household what matters most for them and the first thing to do.
+Reply with ONLY JSON: {{"summary": "..."}}"""
+        text, _ = gemini.generate([{"text": prompt}], json_mode=True, temperature=0.2, budget=BUDGET)
+        return str(gemini.parse_json(text).get("summary") or "").strip(), items
     prompt = f"""You help families get ready for a strong El Niño winter. Write in {lang}, in plain words a 12-year-old understands.
 Place: {place}. Storm risk: {risk['level']} ({risk['score']}/100). Why: {factors or 'no special risks found'}.
 Household: {who}.
@@ -33,7 +46,7 @@ Household: {who}.
 2. Rewrite every task below in {lang}. Keep the meaning and every safety number exactly (gallons, inches, days, phone numbers, program names, website names). Do not add or remove tasks.
 Tasks: {slim}
 Reply with ONLY JSON: {{"summary": "...", "items": [{{"id": "...", "title": "...", "why": "..."}}]}}"""
-    text, _ = gemini.generate([{"text": prompt}], json_mode=True, temperature=0.2)
+    text, _ = gemini.generate([{"text": prompt}], json_mode=True, temperature=0.2, budget=BUDGET)
     data = gemini.parse_json(text)
     got = {i.get("id"): i for i in data.get("items", []) if isinstance(i, dict)}
     if set(got) != {i["id"] for i in items}:

@@ -11,6 +11,7 @@ import re
 import secrets
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 
@@ -160,6 +161,13 @@ ROLES = ("household", "farmer")
 FARM_GROWS = ("vegetables", "field", "orchard", "livestock", "nursery")
 
 
+def _run_job(fn):
+    try:
+        return fn()
+    finally:
+        db.close()  # each worker thread has its own database connection
+
+
 def gather(lat, lon, place):
     """Collect live data for one spot. Each source can fail on its own;
     the plan is still built from whatever succeeded, and we say what's missing."""
@@ -167,14 +175,18 @@ def gather(lat, lon, place):
     out = {"alerts": [], "forecast": [], "rain": None, "flood": None, "elevation": None}
     us = (place.get("country") in (None, "US"))
     if us:
-        for name, fn in (("alerts", lambda: weather.alerts(lat, lon)),
-                         ("forecast", lambda: weather.forecast(lat, lon)),
-                         ("flood", lambda: flood.flood_zone(lat, lon)),
-                         ("elevation", lambda: flood.elevation_ft(lat, lon))):
-            try:
-                out[name] = fn()
-            except ServiceError:
-                missing.append(name)
+        jobs = {"alerts": lambda: weather.alerts(lat, lon),
+                "forecast": lambda: weather.forecast(lat, lon),
+                "flood": lambda: flood.flood_zone(lat, lon),
+                "elevation": lambda: flood.elevation_ft(lat, lon)}
+        # Ask all four sources at the same time instead of one after another.
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {name: pool.submit(_run_job, fn) for name, fn in jobs.items()}
+            for name, fut in futures.items():
+                try:
+                    out[name] = fut.result()
+                except ServiceError:
+                    missing.append(name)
         out["rain"] = weather.rain_outlook(out["forecast"])
     else:
         missing += ["alerts", "forecast", "flood", "elevation"]
@@ -239,7 +251,26 @@ def make_plan():
                (plan_id, device, label, place.get("address"), lat, lon, place.get("county"), place.get("city"),
                 place.get("state"), language, json.dumps({**household, "country": place.get("country") or "US"}), json.dumps({**r, "summary": summary, "translated": translated}),
                 json.dumps(items), ts, ts))
+    _rejoin_place(place)
     return jsonify(plan_payload(plan_id, live=live, help_=help_, missing=missing, translated=translated)), 201
+
+
+def _rejoin_place(place):
+    """Making a new plan somewhere you'd left brings back that county and city community."""
+    a = current_account()
+    if not a:
+        return
+    region = place.get("state") or place.get("country") or ""
+    keys = []
+    if place.get("county"):
+        keys.append(f"county:{region}:{place['county']}")
+    city = geocode.clean_city(place.get("city"))
+    if city:
+        keys.append(f"city:{region}:{city}")
+    for k in keys:
+        c = db.one("SELECT id FROM communities WHERE place_key = ?", (k,))
+        if c:
+            db.execute("DELETE FROM community_left WHERE community_id = ? AND account_id = ?", (c["id"], a["id"]))
 
 
 def plan_payload(plan_id, live=None, help_=None, missing=None, translated=False):
@@ -926,8 +957,11 @@ def _add_member(cid, account_id, role="member"):
 def _auto_join(a):
     """Join the county and city communities for every place on this account."""
     if a:
+        left = {r["community_id"] for r in db.query("SELECT community_id FROM community_left WHERE account_id = ?", (a["id"],))}
         for s in _place_communities(a["device_id"]).values():
-            _add_member(_place_community(s)["id"], a["id"])
+            cid = _place_community(s)["id"]
+            if cid not in left:
+                _add_member(cid, a["id"])
 
 
 def _can_post(c, m):
@@ -1071,8 +1105,10 @@ def get_community(cid):
 @app.post("/api/communities/<cid>/leave")
 def leave_community(cid):
     a, c = own_community(cid)
-    if c["kind"] in OFFICIAL_KINDS:
-        raise BadRequest("You stay in your county and city communities while you have a plan there")
+    if c["kind"] in OFFICIAL_KINDS and not db.one(
+            "SELECT 1 AS x FROM community_left WHERE community_id = ? AND account_id = ?", (cid, a["id"])):
+        # Remember it, or the next refresh would add this county or city back.
+        db.execute("INSERT INTO community_left (community_id, account_id, left_at) VALUES (?,?,?)", (cid, a["id"], now_iso()))
     db.execute("DELETE FROM community_members WHERE community_id = ? AND account_id = ?", (cid, a["id"]))
     if c["kind"] in GROUP_KINDS and not db.one("SELECT 1 AS x FROM community_members WHERE community_id = ?", (cid,)):
         db.execute("DELETE FROM communities WHERE id = ?", (cid,))
